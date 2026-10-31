@@ -44,6 +44,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.myday.app.alarm.CareNotifier
+import com.myday.app.alarm.SimInfo
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.SimCard
+import androidx.compose.material3.RadioButton
 import com.myday.app.settings.AppSettings
 import com.myday.app.settings.CareContact
 import com.myday.app.settings.DEFAULT_CARE_MESSAGE
@@ -56,6 +60,16 @@ fun CareSection(vm: AppViewModel, settings: AppSettings) {
     var editing by remember { mutableStateOf<Pair<Int, CareContact>?>(null) }
     var editMessage by remember { mutableStateOf(false) }
     var hasSms by remember { mutableStateOf(CareNotifier.hasSmsPermission(context)) }
+    var sims by remember { mutableStateOf<List<SimInfo>?>(null) }
+
+    val phoneStateLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) sims = CareNotifier.activeSims(context)
+        else vm.message("بدون هذا الإذن تُرسل الرسالة من الشريحة الافتراضية في الهاتف")
+    }
+    fun openSimPicker() {
+        if (CareNotifier.hasPhoneStatePermission(context)) sims = CareNotifier.activeSims(context)
+        else phoneStateLauncher.launch(Manifest.permission.READ_PHONE_STATE)
+    }
 
     val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         hasSms = ok
@@ -112,21 +126,37 @@ fun CareSection(vm: AppViewModel, settings: AppSettings) {
             }
         }
         if (settings.careContacts.size < 3) {
-            Row(Modifier.padding(top = 6.dp)) {
+            FlowRow(Modifier.padding(top = 6.dp)) {
                 TextButton(onClick = {
                     ensureSms()
                     pickLauncher.launch(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI))
                 }) {
                     Icon(Icons.Rounded.Contacts, null); Spacer(Modifier.width(6.dp)); Text("من جهات الاتصال")
                 }
-                TextButton(onClick = { ensureSms(); editing = -1 to CareContact("", "") }) { Text("إدخال رقم يدوياً") }
+                TextButton(onClick = { ensureSms(); editing = -1 to CareContact("", "") }) { Text("رقم يدوي") }
             }
         }
         if (settings.careContacts.isNotEmpty()) {
             if (!hasSms) {
                 TextButton(onClick = { ensureSms() }) { Text("⚠️ منح إذن إرسال الرسائل (مطلوب)", color = MaterialTheme.colorScheme.error) }
             }
-            Row {
+            Row(
+                Modifier.fillMaxWidth().clickable { openSimPicker() }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Rounded.SimCard, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("شريحة الإرسال", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (settings.careSimSubId >= 0 && settings.careSimLabel.isNotBlank()) settings.careSimLabel
+                        else "الافتراضية في إعدادات الهاتف",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Text("تغيير", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
+            FlowRow {
                 TextButton(onClick = { editMessage = true }) { Text("نص الرسالة") }
                 TextButton(onClick = { if (hasSms) vm.sendCareTest() else ensureSms() }) {
                     Icon(Icons.Rounded.Sms, null); Spacer(Modifier.width(6.dp)); Text("إرسال رسالة تجريبية")
@@ -168,6 +198,30 @@ fun CareSection(vm: AppViewModel, settings: AppSettings) {
         )
     }
 
+    sims?.let { list ->
+        AlertDialog(
+            onDismissRequest = { sims = null },
+            title = { Text("الإرسال من أي شريحة؟") },
+            text = {
+                Column {
+                    SimOption("الافتراضية في إعدادات الهاتف", settings.careSimSubId < 0) {
+                        vm.setCareSim(-1, ""); sims = null
+                    }
+                    list.forEach { sim ->
+                        SimOption(sim.label, settings.careSimSubId == sim.subId) {
+                            vm.setCareSim(sim.subId, sim.label); sims = null
+                        }
+                    }
+                    if (list.isEmpty()) {
+                        Text("لم يُعثر على شرائح نشطة.", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { sims = null }) { Text("إغلاق") } }
+        )
+    }
+
     if (editMessage) {
         var text by remember { mutableStateOf(settings.careMessage) }
         AlertDialog(
@@ -184,5 +238,13 @@ fun CareSection(vm: AppViewModel, settings: AppSettings) {
             confirmButton = { TextButton(onClick = { vm.setCareMessage(text); editMessage = false }) { Text("حفظ") } },
             dismissButton = { TextButton(onClick = { editMessage = false }) { Text("إلغاء") } }
         )
+    }
+}
+
+@Composable
+private fun SimOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }

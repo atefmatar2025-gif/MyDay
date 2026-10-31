@@ -126,14 +126,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setTextScale(v: Float) = launchSafe { settingsRepo.setTextScale(v) }
     fun setCareContacts(v: List<CareContact>) = launchSafe { settingsRepo.setCareContacts(v) }
     fun setCareMessage(v: String) = launchSafe { settingsRepo.setCareMessage(v) }
+    fun setCareSim(subId: Int, label: String) = launchSafe { settingsRepo.setCareSim(subId, label) }
 
     /** رسالة تجريبية لأول جهة اتصال للتأكد من عمل الإبلاغ. */
     fun sendCareTest() = launchSafe {
         val s = settings.value
         val c = s.careContacts.firstOrNull() ?: run { _messages.emit(UiMessage("أضف جهة اتصال أولاً")); return@launchSafe }
-        val text = "رسالة تجريبية من تطبيق يومي: أنت مسجَّل لتلقي تنبيهات الرعاية الخاصة بـ ${s.userName.ifBlank { "صاحب الهاتف" }}."
-        val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { CareNotifier.send(getApplication<Application>(), c.phone, text) }
-        _messages.emit(UiMessage(if (ok) "أُرسلت رسالة تجريبية إلى ${c.name}" else "تعذر الإرسال — تحقق من صلاحية الرسائل والشريحة"))
+        // نفس نص الرسالة الحقيقية الذي كتبه المستخدم، مع مهمة مثال ووسم «تجريبية»
+        val app = getApplication<Application>()
+        val body = CareNotifier.buildMessage(
+            s.careMessage, s.userName, "مهمة تجريبية", System.currentTimeMillis(),
+            android.text.format.DateFormat.is24HourFormat(app)
+        )
+        val text = "(رسالة تجريبية) $body"
+        val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { CareNotifier.send(app, c.phone, text, s.careSimSubId) }
+        val sim = if (s.careSimSubId >= 0 && s.careSimLabel.isNotBlank()) " عبر ${s.careSimLabel}" else ""
+        _messages.emit(UiMessage(if (ok) "أُرسلت رسالة تجريبية إلى ${c.name}$sim" else "تعذر الإرسال — تحقق من صلاحية الرسائل والشريحة"))
     }
 
     fun finishOnboarding() = launchSafe { settingsRepo.setOnboardingDone(true) }

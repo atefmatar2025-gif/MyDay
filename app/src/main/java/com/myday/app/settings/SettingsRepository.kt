@@ -37,6 +37,9 @@ data class AppSettings(
     val textScale: Float = 1f,
     val careContacts: List<CareContact> = emptyList(),
     val careMessage: String = DEFAULT_CARE_MESSAGE,
+    /** معرّف الشريحة للإرسال؛ -1 = الشريحة الافتراضية في الهاتف */
+    val careSimSubId: Int = -1,
+    val careSimLabel: String = "",
 )
 
 data class CareContact(val name: String, val phone: String)
@@ -67,6 +70,8 @@ class SettingsRepository(private val context: Context) {
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val CARE_CONTACTS = stringPreferencesKey("care_contacts")
         val CARE_MESSAGE = stringPreferencesKey("care_message")
+        val CARE_SIM = intPreferencesKey("care_sim_sub_id")
+        val CARE_SIM_LABEL = stringPreferencesKey("care_sim_label")
     }
 
     private fun encodeContacts(list: List<CareContact>) =
@@ -100,6 +105,8 @@ class SettingsRepository(private val context: Context) {
                 textScale = p[Keys.TEXT_SCALE] ?: d.textScale,
                 careContacts = decodeContacts(p[Keys.CARE_CONTACTS]),
                 careMessage = p[Keys.CARE_MESSAGE]?.takeIf { it.isNotBlank() } ?: d.careMessage,
+                careSimSubId = p[Keys.CARE_SIM] ?: d.careSimSubId,
+                careSimLabel = p[Keys.CARE_SIM_LABEL] ?: d.careSimLabel,
             )
         }
 
@@ -123,5 +130,9 @@ class SettingsRepository(private val context: Context) {
     suspend fun setTextScale(v: Float) = context.dataStore.edit { it[Keys.TEXT_SCALE] = v.coerceIn(0.9f, 1.5f) }
     suspend fun setCareContacts(v: List<CareContact>) = context.dataStore.edit { it[Keys.CARE_CONTACTS] = encodeContacts(v.take(3)) }
     suspend fun setCareMessage(v: String) = context.dataStore.edit { it[Keys.CARE_MESSAGE] = v.trim() }
+    suspend fun setCareSim(subId: Int, label: String) = context.dataStore.edit {
+        it[Keys.CARE_SIM] = subId
+        it[Keys.CARE_SIM_LABEL] = label
+    }
     suspend fun setOnboardingDone(v: Boolean) = context.dataStore.edit { it[Keys.ONBOARDING] = v }
 }
