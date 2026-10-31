@@ -67,12 +67,13 @@ object Routes {
     const val WELCOME = "welcome"
     const val PRAYER = "prayer"
     const val DETAIL = "task/{id}"
-    const val EDITOR = "editor?taskId={taskId}&copyFrom={copyFrom}&date={date}"
+    const val EDITOR = "editor?taskId={taskId}&copyFrom={copyFrom}&date={date}&draft={draft}"
 
     fun detail(id: Long) = "task/$id"
     fun newTask(date: LocalDate? = null) = if (date != null) "editor?date=${date.toEpochDay()}" else "editor"
     fun editTask(id: Long) = "editor?taskId=$id"
     fun copyTask(id: Long) = "editor?copyFrom=$id"
+    const val DRAFT = "editor?draft=1"
 }
 
 private data class TopLevel(val route: String, val label: String, val icon: ImageVector)
@@ -161,6 +162,7 @@ fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>) {
                     vm, settings,
                     onOpenTask = { nav.navigate(Routes.detail(it)) },
                     onAddTask = { nav.navigate(Routes.newTask()) },
+                    onOpenDraft = { nav.navigate(Routes.DRAFT) },
                     onSeeAll = { nav.navigateTopLevel(Routes.TASKS) },
                     onOpenPermissions = { nav.navigate(Routes.PERMISSIONS) },
                     onOpenPrayer = { nav.navigate(Routes.PRAYER) }
@@ -172,7 +174,9 @@ fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>) {
                     vm, settings,
                     onOpenTask = { nav.navigate(Routes.detail(it)) },
                     onAddTask = { nav.navigate(Routes.newTask()) },
-                    onOpenCategories = { nav.navigate(Routes.CATEGORIES) }
+                    onOpenDraft = { nav.navigate(Routes.DRAFT) },
+                    onOpenCategories = { nav.navigate(Routes.CATEGORIES) },
+                    onOpenPrayer = { nav.navigate(Routes.PRAYER) }
                 )
             }
             composable(Routes.CALENDAR) {
@@ -213,6 +217,7 @@ fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>) {
                     navArgument("taskId") { type = NavType.LongType; defaultValue = -1L },
                     navArgument("copyFrom") { type = NavType.LongType; defaultValue = -1L },
                     navArgument("date") { type = NavType.LongType; defaultValue = -1L },
+                    navArgument("draft") { type = NavType.LongType; defaultValue = -1L },
                 )
             ) {
                 EditorScreen(

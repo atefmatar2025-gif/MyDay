@@ -11,6 +11,10 @@ import com.myday.app.data.CategoryEntity
 import com.myday.app.data.CompletionEntity
 import com.myday.app.data.TaskEntity
 import com.myday.app.prayer.PrayerConfig
+import com.myday.app.nlp.ParsedTask
+import com.myday.app.nlp.QuickDraft
+import com.myday.app.nlp.QuickTaskBuilder
+import java.time.LocalDateTime
 import com.myday.app.prayer.PrayerStore
 import com.myday.app.settings.AppSettings
 import com.myday.app.settings.CareContact
@@ -142,6 +146,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { CareNotifier.send(app, c.phone, text, s.careSimSubId) }
         val sim = if (s.careSimSubId >= 0 && s.careSimLabel.isNotBlank()) " عبر ${s.careSimLabel}" else ""
         _messages.emit(UiMessage(if (ok) "أُرسلت رسالة تجريبية إلى ${c.name}$sim" else "تعذر الإرسال — تحقق من صلاحية الرسائل والشريحة"))
+    }
+
+    /**
+     * حفظ مهمة من جملة مكتوبة أو منطوقة. يرجع false إذا احتاجت تحديد المدينة (مرتبطة بصلاة).
+     */
+    fun quickSave(p: ParsedTask): Boolean {
+        val due = QuickTaskBuilder.resolveDue(p, LocalDateTime.now(), PrayerStore.current()) ?: return false
+        val task = QuickTaskBuilder.build(p, due, settings.value, categories.value)
+        launchSafe {
+            val id = repo.saveTask(task)
+            _messages.emit(
+                UiMessage("أُضيفت «${task.title}» — ${com.myday.app.util.Fmt.dateTime(due, settings.value.use24h)}", "تراجع") {
+                    launchSafe { repo.deleteTask(id) }
+                }
+            )
+        }
+        return true
+    }
+
+    /** تجهيز مسودة لفتحها في شاشة التعديل. */
+    fun prepareDraft(p: ParsedTask) {
+        val due = QuickTaskBuilder.resolveDue(p, LocalDateTime.now(), PrayerStore.current())
+            ?: LocalDateTime.now().plusHours(1).withMinute(0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        QuickDraft.put(QuickTaskBuilder.build(p, due, settings.value, categories.value))
     }
 
     fun finishOnboarding() = launchSafe { settingsRepo.setOnboardingDone(true) }

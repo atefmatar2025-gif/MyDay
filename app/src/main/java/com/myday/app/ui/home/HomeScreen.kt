@@ -33,6 +33,11 @@ import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material.icons.rounded.HourglassBottom
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.myday.app.ui.quickadd.QuickAddSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -78,11 +83,13 @@ fun HomeScreen(
     settings: AppSettings,
     onOpenTask: (Long) -> Unit,
     onAddTask: () -> Unit,
+    onOpenDraft: () -> Unit,
     onSeeAll: () -> Unit,
     onOpenPermissions: () -> Unit,
     onOpenPrayer: () -> Unit,
 ) {
     val prayerCfg by vm.prayerConfig.collectAsStateWithLifecycle()
+    var quickAdd by remember { mutableStateOf<Boolean?>(null) }
     val tasks by vm.tasks.collectAsStateWithLifecycle()
     val categories by vm.categories.collectAsStateWithLifecycle()
     val completions by vm.completions.collectAsStateWithLifecycle()
@@ -112,11 +119,17 @@ fun HomeScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddTask,
-                icon = { Icon(Icons.Rounded.Add, null) },
-                text = { Text("مهمة جديدة") }
-            )
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SmallFloatingActionButton(
+                    onClick = { quickAdd = true },
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                ) { Icon(Icons.Rounded.Mic, "أضف بصوتك") }
+                ExtendedFloatingActionButton(
+                    onClick = onAddTask,
+                    icon = { Icon(Icons.Rounded.Add, null) },
+                    text = { Text("مهمة جديدة") }
+                )
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -219,6 +232,14 @@ fun HomeScreen(
                 }
             }
         }
+    }
+    quickAdd?.let { voice ->
+        QuickAddSheet(
+            vm = vm, startWithVoice = voice,
+            onDismiss = { quickAdd = null },
+            onOpenDraft = onOpenDraft,
+            onOpenPrayerSettings = onOpenPrayer
+        )
     }
 }
 

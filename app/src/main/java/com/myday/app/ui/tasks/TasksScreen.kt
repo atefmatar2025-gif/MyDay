@@ -34,6 +34,9 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material.icons.rounded.Mic
+import com.myday.app.ui.quickadd.QuickAddSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,8 +82,11 @@ fun TasksScreen(
     settings: AppSettings,
     onOpenTask: (Long) -> Unit,
     onAddTask: () -> Unit,
+    onOpenDraft: () -> Unit,
     onOpenCategories: () -> Unit,
+    onOpenPrayer: () -> Unit,
 ) {
+    var quickAdd by remember { mutableStateOf<Boolean?>(null) }
     val tasks by vm.tasks.collectAsStateWithLifecycle()
     val categories by vm.categories.collectAsStateWithLifecycle()
     val now by vm.now.collectAsStateWithLifecycle()
@@ -131,7 +137,13 @@ fun TasksScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddTask) { Icon(Icons.Rounded.Add, "مهمة جديدة") }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SmallFloatingActionButton(
+                    onClick = { quickAdd = true },
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                ) { Icon(Icons.Rounded.Mic, "أضف بصوتك") }
+                FloatingActionButton(onClick = onAddTask) { Icon(Icons.Rounded.Add, "مهمة جديدة") }
+            }
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).statusBarsPadding()) {
@@ -226,6 +238,10 @@ fun TasksScreen(
                 }
             }
         }
+    }
+
+    quickAdd?.let { voice ->
+        QuickAddSheet(vm, voice, onDismiss = { quickAdd = null }, onOpenDraft = onOpenDraft, onOpenPrayerSettings = onOpenPrayer)
     }
 
     if (showFilters) {

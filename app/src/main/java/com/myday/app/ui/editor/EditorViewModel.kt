@@ -20,6 +20,7 @@ import com.myday.app.prayer.Prayer
 import com.myday.app.prayer.PrayerConfig
 import com.myday.app.prayer.PrayerStore
 import com.myday.app.util.TaskTime
+import com.myday.app.nlp.QuickDraft
 import kotlin.math.abs
 import kotlin.math.sign
 
@@ -73,6 +74,7 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
     private val taskId: Long = handle.get<Long>("taskId") ?: -1L
     private val copyFrom: Long = handle.get<Long>("copyFrom") ?: -1L
     private val presetDay: Long = handle.get<Long>("date") ?: -1L
+    private val useDraft: Boolean = (handle.get<Long>("draft") ?: -1L) > 0
 
     private val _state = MutableStateFlow(EditorState())
     val state: StateFlow<EditorState> = _state
@@ -88,7 +90,9 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
                 repeatIntervalMin = s.repeatIntervalMin,
                 maxRepeats = s.maxRepeats,
             )
+            val draft = if (useDraft) QuickDraft.take() else null
             val source = when {
+                draft != null -> draft
                 taskId > 0 -> repo.getTask(taskId)
                 copyFrom > 0 -> repo.getTask(copyFrom)
                 else -> null
@@ -97,7 +101,7 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
                 val ldt = Fmt.toLdt(source.dueAt)
                 val anchored = Prayer.fromName(source.anchorPrayer)
                 var date = if (anchored != null) TaskTime.anchorDate(source) else ldt.toLocalDate()
-                if (taskId <= 0) {
+                if (taskId <= 0 && draft == null) {
                     // نسخة من مهمة سابقة: ننقلها لأقرب موعد قادم بنفس الساعة
                     val today = LocalDate.now()
                     date = if (LocalDateTime.of(today, ldt.toLocalTime()).isAfter(LocalDateTime.now())) today else today.plusDays(1)
