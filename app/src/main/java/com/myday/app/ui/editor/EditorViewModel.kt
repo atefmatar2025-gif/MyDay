@@ -16,6 +16,12 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import com.myday.app.prayer.Prayer
+import com.myday.app.prayer.PrayerConfig
+import com.myday.app.prayer.PrayerStore
+import com.myday.app.util.TaskTime
+import kotlin.math.abs
+import kotlin.math.sign
 
 data class EditorState(
     val loaded: Boolean = false,
@@ -39,11 +45,24 @@ data class EditorState(
     val maxRepeats: Int = 3,
     val titleError: Boolean = false,
     val saving: Boolean = false,
+    /** وضع «مرتبط بالصلاة» */
+    val prayerMode: Boolean = false,
+    val prayer: Prayer = Prayer.ASR,
+    /** -1 قبل، 0 عند، 1 بعد */
+    val relation: Int = 1,
+    val offsetAbs: Int = 30,
 ) {
+    val offsetMin: Int get() = if (relation == 0) 0 else relation * offsetAbs
+
+    /** موعد الوقت الثابت (يُستخدم أيضاً لعرض التاريخ). */
     val dueAt: Long get() = Fmt.toMillis(LocalDateTime.of(date, time))
+
+    /** الموعد الفعلي حسب الوضع؛ null إذا لم تُحدَّد المدينة في وضع الصلاة. */
+    fun effectiveDueAt(cfg: PrayerConfig? = PrayerStore.current()): Long? =
+        if (prayerMode) TaskTime.prayerTime(date, prayer, offsetMin, cfg) else dueAt
 }
 
-enum class SaveResult { SAVED, NEED_TITLE, PAST_TIME }
+enum class SaveResult { SAVED, NEED_TITLE, PAST_TIME, NEED_LOCATION }
 
 class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewModel(app) {
 
@@ -75,7 +94,8 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
             }
             _state.value = if (source != null) {
                 val ldt = Fmt.toLdt(source.dueAt)
-                var date = ldt.toLocalDate()
+                val anchored = Prayer.fromName(source.anchorPrayer)
+                var date = if (anchored != null) TaskTime.anchorDate(source) else ldt.toLocalDate()
                 if (taskId <= 0) {
                     // نسخة من مهمة سابقة: ننقلها لأقرب موعد قادم بنفس الساعة
                     val today = LocalDate.now()
@@ -100,6 +120,10 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
                     repeatIfNoResponse = source.repeatIfNoResponse,
                     repeatIntervalMin = source.repeatIntervalMin,
                     maxRepeats = source.maxRepeats,
+                    prayerMode = anchored != null,
+                    prayer = anchored ?: Prayer.ASR,
+                    relation = source.anchorOffsetMin.sign,
+                    offsetAbs = if (source.anchorOffsetMin == 0) 30 else abs(source.anchorOffsetMin),
                 )
             } else {
                 // مهمة جديدة: الساعة الكاملة القادمة (في اليوم المختار من التقويم إن وجد)
@@ -118,20 +142,23 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
             _state.update { it.copy(titleError = true) }
             return SaveResult.NEED_TITLE
         }
+        val due = s.effectiveDueAt() ?: return SaveResult.NEED_LOCATION
         val originalDue = s.original?.dueAt
-        if (!force && s.repeatType == RepeatType.NONE && s.dueAt <= System.currentTimeMillis() &&
-            originalDue != s.dueAt
+        if (!force && s.repeatType == RepeatType.NONE && due <= System.currentTimeMillis() &&
+            originalDue != due
         ) return SaveResult.PAST_TIME
         if (s.saving) return SaveResult.SAVED
 
         _state.update { it.copy(saving = true) }
         val base = s.original ?: TaskEntity(title = "", dueAt = 0)
         val nowMs = System.currentTimeMillis()
-        val reactivate = s.original?.let { it.isCompleted && s.dueAt > nowMs && it.dueAt != s.dueAt } ?: false
+        val reactivate = s.original?.let { it.isCompleted && due > nowMs && it.dueAt != due } ?: false
         val task = base.copy(
             title = s.title,
             description = s.description,
-            dueAt = s.dueAt,
+            dueAt = due,
+            anchorPrayer = if (s.prayerMode) s.prayer.name else null,
+            anchorOffsetMin = if (s.prayerMode) s.offsetMin else 0,
             priority = s.priority,
             categoryId = s.categoryId,
             repeatType = s.repeatType,

@@ -5,6 +5,7 @@ import androidx.room.withTransaction
 import com.myday.app.alarm.AlarmScheduler
 import com.myday.app.alarm.NotificationHelper
 import com.myday.app.util.Recurrence
+import com.myday.app.util.TaskTime
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -81,7 +82,7 @@ class TaskRepository(
             )
             if (task.isRecurring) {
                 // ننتقل إلى الموعد القادم في السلسلة (بعد الآن وبعد الموعد الحالي)
-                val next = Recurrence.firstAfter(task.dueAt, task.repeatType, maxOf(now, task.dueAt))
+                val next = TaskTime.firstAfter(task, maxOf(now, task.dueAt))
                     ?: Recurrence.next(task.dueAt, task.repeatType)
                     ?: task.dueAt
                 taskDao.update(task.copy(dueAt = next, snoozedUntil = null, ringAttempt = 0, updatedAt = now))
@@ -198,6 +199,24 @@ class TaskRepository(
                 taskDao.update(t)
             }
             if (t.isCompleted) scheduler.cancel(t.id) else scheduler.schedule(t, now)
+        }
+    }
+
+    /** بعد تغيير المدينة أو طريقة الحساب: إعادة حساب مواعيد المهام المرتبطة بالصلاة. */
+    suspend fun recomputePrayerTasks() {
+        val now = System.currentTimeMillis()
+        taskDao.getActive().filter { it.anchorPrayer != null }.forEach { t ->
+            val date = TaskTime.anchorDate(t)
+            var due = TaskTime.timeOn(t, date) ?: return@forEach
+            // للمهام المتكررة نضمن أن الموعد الحالي لم يصبح في الماضي بسبب التعديل فقط
+            if (t.isRecurring && due <= now && t.dueAt > now) {
+                due = TaskTime.firstAfter(t.copy(dueAt = due), now) ?: due
+            }
+            if (due != t.dueAt) {
+                val updated = t.copy(dueAt = due, updatedAt = now)
+                taskDao.update(updated)
+                scheduler.schedule(updated)
+            }
         }
     }
 

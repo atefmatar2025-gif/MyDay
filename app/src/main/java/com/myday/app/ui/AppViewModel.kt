@@ -10,6 +10,8 @@ import com.myday.app.container
 import com.myday.app.data.CategoryEntity
 import com.myday.app.data.CompletionEntity
 import com.myday.app.data.TaskEntity
+import com.myday.app.prayer.PrayerConfig
+import com.myday.app.prayer.PrayerStore
 import com.myday.app.settings.AppSettings
 import com.myday.app.settings.ThemeMode
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -51,6 +53,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             delay(20_000)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), System.currentTimeMillis())
+
+    val prayerConfig: StateFlow<PrayerConfig?> = PrayerStore.config
 
     private val _messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
     val messages: SharedFlow<UiMessage> = _messages
@@ -120,6 +124,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun finishOnboarding() = launchSafe { settingsRepo.setOnboardingDone(true) }
 
     fun rescheduleAll() = launchSafe { repo.rescheduleAll() }
+
+    /** حفظ المدينة/طريقة الحساب ثم إعادة حساب مواعيد المهام المرتبطة بالصلاة ومنبهاتها. */
+    fun savePrayerConfig(cfg: PrayerConfig, announce: Boolean = true) = launchSafe {
+        PrayerStore.save(cfg)
+        repo.recomputePrayerTasks()
+        if (announce) _messages.emit(UiMessage("تم الحفظ — ${cfg.cityName}"))
+    }
 
     /** ينشئ مهمة اختبار حقيقية يرن منبهها بعد [seconds] ثانية (يطلبها المستخدم بنفسه). */
     fun createTestAlarm(seconds: Int = 60) = launchSafe {

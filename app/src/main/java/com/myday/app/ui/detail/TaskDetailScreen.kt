@@ -70,6 +70,8 @@ import com.myday.app.ui.components.color
 import com.myday.app.ui.theme.PriorityColors
 import com.myday.app.ui.theme.isAppInDarkTheme
 import com.myday.app.util.Fmt
+import com.myday.app.util.TaskTime
+import androidx.compose.material.icons.rounded.Brightness2
 import com.myday.app.alarm.AlarmTimes
 import androidx.compose.ui.platform.LocalContext
 
@@ -152,6 +154,9 @@ fun TaskDetailScreen(
 
             Spacer(Modifier.height(12.dp))
             InfoRow(Icons.Rounded.CalendarMonth, "الموعد", Fmt.dateTime(task.dueAt, settings.use24h))
+            TaskTime.anchorLabel(task)?.let { label ->
+                InfoRow(Icons.Rounded.Brightness2, "مرتبط بالصلاة", if (task.isRecurring) "$label — يتغير يومياً مع وقت الصلاة" else label)
+            }
             InfoRow(Icons.Rounded.Flag, "الأولوية", task.priority.label, PriorityColors.of(task.priority, dark))
             InfoRow(
                 if (category != null) CategoryIcons.get(category.iconKey) else Icons.Rounded.Category,

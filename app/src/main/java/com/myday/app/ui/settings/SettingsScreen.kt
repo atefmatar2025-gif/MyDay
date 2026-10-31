@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.AlarmAdd
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Brightness2
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -66,6 +67,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.myday.app.settings.AppSettings
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.myday.app.settings.ThemeMode
 import com.myday.app.ui.AppViewModel
 import com.myday.app.ui.components.ConfirmDialog
@@ -80,6 +82,7 @@ fun SettingsScreen(
     settings: AppSettings,
     onOpenCategories: () -> Unit,
     onOpenPermissions: () -> Unit,
+    onOpenPrayer: () -> Unit,
 ) {
     val context = LocalContext.current
     var editName by remember { mutableStateOf(false) }
@@ -129,6 +132,12 @@ fun SettingsScreen(
                 }
                 SwitchItem(Icons.Rounded.Schedule, "نظام 24 ساعة", if (settings.use24h) "14:30" else "2:30 م", settings.use24h, vm::setUse24h)
                 ClickItem(Icons.Rounded.Person, "اسمك في الترحيب", settings.userName.ifBlank { "لم يُحدد" }) { editName = true }
+            }
+
+            Group("أوقات الصلاة") {
+                val pc by vm.prayerConfig.collectAsStateWithLifecycle()
+                ClickItem(Icons.Rounded.Brightness2, "المدينة وطريقة الحساب",
+                    pc?.let { "${it.cityName} • ${it.method.label}" } ?: "لم تُحدد بعد — مطلوبة للمهام المرتبطة بالصلاة", onOpenPrayer)
             }
 
             Group("المنبه الافتراضي للمهام الجديدة") {

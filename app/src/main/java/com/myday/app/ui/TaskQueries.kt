@@ -4,7 +4,7 @@ import com.myday.app.data.isRecurring
 import com.myday.app.data.CompletionEntity
 import com.myday.app.data.TaskEntity
 import com.myday.app.util.Fmt
-import com.myday.app.util.Recurrence
+import com.myday.app.util.TaskTime
 import java.time.LocalDate
 
 /** عنصر في الجدول الزمني ليوم ما (مهمة معلقة أو إنجاز مسجل). */
@@ -51,7 +51,7 @@ object TaskQueries {
                 if (t.dueAt in start until end) result += DayEntry(t, t.dueAt, t.isCompleted)
             } else if (!t.isCompleted) {
                 // الموعد الحالي إن كان في هذا اليوم، أو تكرار مستقبلي يقع فيه
-                val occ = Recurrence.occursOnDay(t.dueAt, t.repeatType, start, end)
+                val occ = TaskTime.occursOnDay(t, start, end)
                 if (occ != null && (t.id to occ) !in doneOccurrences) result += DayEntry(t, occ, false)
             }
         }

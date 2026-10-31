@@ -5,11 +5,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TaskEntity::class, CategoryEntity::class, CompletionEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -34,10 +35,19 @@ abstract class AppDatabase : RoomDatabase() {
             Triple("المهام المنزلية", 0xFF0891B2L, "home"),
         )
 
+        /** الإصدار 2: ربط المهام بأوقات الصلاة. يحافظ على كل البيانات الموجودة. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN anchorPrayer TEXT")
+                db.execSQL("ALTER TABLE tasks ADD COLUMN anchorOffsetMin INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "myday.db")
                 // لا نستخدم fallbackToDestructiveMigration حتى لا تُفقد البيانات عند التحديث.
                 // أي تغيير مستقبلي في البنية يجب أن يرافقه Migration صريح.
+                .addMigrations(MIGRATION_1_2)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)

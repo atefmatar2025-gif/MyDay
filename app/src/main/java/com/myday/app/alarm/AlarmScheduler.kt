@@ -9,7 +9,7 @@ import android.os.Build
 import android.util.Log
 import com.myday.app.MainActivity
 import com.myday.app.data.TaskEntity
-import com.myday.app.util.Recurrence
+import com.myday.app.util.TaskTime
 
 /** حساب أوقات المنبه والتذكير — دوال نقية قابلة للاختبار. */
 object AlarmTimes {
@@ -18,7 +18,7 @@ object AlarmTimes {
     fun nextAlarm(task: TaskEntity, now: Long): Long? {
         if (task.isCompleted || !task.alarmEnabled) return null
         task.snoozedUntil?.let { if (it > now) return it }
-        return Recurrence.firstAfter(task.dueAt, task.repeatType, now)
+        return TaskTime.firstAfter(task, now)
     }
 
     /** وقت التذكير المسبق القادم (trigger) والموعد الذي يخصه (occurrence). */
@@ -26,7 +26,7 @@ object AlarmTimes {
         if (task.isCompleted || task.reminderMinutesBefore <= 0) return null
         val offset = task.reminderMinutesBefore * 60_000L
         // أول موعد يكون تذكيره بعد الآن
-        val occurrence = Recurrence.firstAfter(task.dueAt, task.repeatType, now + offset) ?: return null
+        val occurrence = TaskTime.firstAfter(task, now + offset) ?: return null
         return (occurrence - offset) to occurrence
     }
 }

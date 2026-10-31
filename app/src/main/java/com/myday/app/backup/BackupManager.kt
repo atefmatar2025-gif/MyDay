@@ -77,6 +77,7 @@ class BackupManager(private val context: Context, private val repo: TaskReposito
         .put("soundDurationSec", soundDurationSec).put("repeatIfNoResponse", repeatIfNoResponse)
         .put("repeatIntervalMin", repeatIntervalMin).put("maxRepeats", maxRepeats)
         .put("createdAt", createdAt).put("updatedAt", updatedAt)
+        .put("anchorPrayer", anchorPrayer ?: JSONObject.NULL).put("anchorOffsetMin", anchorOffsetMin)
 
     private fun taskFrom(o: JSONObject) = TaskEntity(
         id = o.getLong("id"),
@@ -99,6 +100,8 @@ class BackupManager(private val context: Context, private val repo: TaskReposito
         maxRepeats = o.optInt("maxRepeats", 3),
         createdAt = o.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+        anchorPrayer = o.optStringOrNull("anchorPrayer"),
+        anchorOffsetMin = o.optInt("anchorOffsetMin", 0),
     )
 
     private fun CompletionEntity.toJson() = JSONObject()

@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Brightness2
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.FormatQuote
@@ -53,6 +54,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.myday.app.settings.AppSettings
+import com.myday.app.prayer.Prayer
+import com.myday.app.prayer.PrayerConfig
+import com.myday.app.prayer.PrayerStore
 import com.myday.app.ui.AppViewModel
 import com.myday.app.ui.DayEntry
 import com.myday.app.ui.TaskQueries
@@ -76,7 +80,9 @@ fun HomeScreen(
     onAddTask: () -> Unit,
     onSeeAll: () -> Unit,
     onOpenPermissions: () -> Unit,
+    onOpenPrayer: () -> Unit,
 ) {
+    val prayerCfg by vm.prayerConfig.collectAsStateWithLifecycle()
     val tasks by vm.tasks.collectAsStateWithLifecycle()
     val categories by vm.categories.collectAsStateWithLifecycle()
     val completions by vm.completions.collectAsStateWithLifecycle()
@@ -119,6 +125,9 @@ fun HomeScreen(
         ) {
             item {
                 Header(settings, clock, today)
+            }
+            item {
+                PrayerStrip(prayerCfg, today, now, settings.use24h, onOpenPrayer)
             }
             if (!permissions.alarmsReady) {
                 item {
@@ -242,6 +251,60 @@ private fun Header(settings: AppSettings, clock: LocalDateTime, today: LocalDate
         val hijri = Fmt.hijri(today)
         if (hijri.isNotEmpty()) {
             Text(hijri, style = MaterialTheme.typography.bodySmall, color = cs.onPrimary.copy(alpha = 0.8f))
+        }
+    }
+}
+
+/** شريط أوقات صلاة اليوم مع العد التنازلي للصلاة القادمة. */
+@Composable
+private fun PrayerStrip(cfg: PrayerConfig?, today: LocalDate, now: Long, use24h: Boolean, onOpen: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    if (cfg == null) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(20.dp))
+                .background(cs.tertiaryContainer).clickable(onClick = onOpen).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Rounded.Brightness2, null, tint = cs.onTertiaryContainer)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("اربط مهامك بأوقات الصلاة", style = MaterialTheme.typography.titleSmall, color = cs.onTertiaryContainer)
+                Text("مثل «بعد العصر بنصف ساعة» — اختر مدينتك", style = MaterialTheme.typography.bodySmall, color = cs.onTertiaryContainer)
+            }
+            TextButton(onClick = onOpen) { Text("تحديد", color = cs.onTertiaryContainer) }
+        }
+        return
+    }
+    val times = remember(cfg, today) { PrayerStore.timesFor(today, cfg) }
+    val tomorrowFajr = remember(cfg, today) { PrayerStore.timesFor(today.plusDays(1), cfg)?.get(Prayer.FAJR) }
+    val next = Prayer.entries.filter { it != Prayer.SUNRISE }.firstOrNull { (times?.get(it) ?: 0L) > now }
+    val nextTime = next?.let { times?.get(it) } ?: tomorrowFajr
+    Column(
+        Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(22.dp))
+            .background(cs.surfaceContainerLow).clickable(onClick = onOpen).padding(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Brightness2, null, tint = cs.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "${(next ?: Prayer.FAJR).label} ${nextTime?.let { Fmt.countdown(it, now) } ?: ""}",
+                style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f)
+            )
+            Text(cfg.cityName, style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Prayer.entries.forEach { p ->
+                val isNext = p == next
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(p.label, style = MaterialTheme.typography.labelSmall,
+                        color = if (isNext) cs.primary else cs.onSurfaceVariant,
+                        fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal)
+                    Text(times?.get(p)?.let { Fmt.time(it, use24h).substringBefore(' ') } ?: "—",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isNext) cs.primary else cs.onSurface)
+                }
+            }
         }
     }
 }

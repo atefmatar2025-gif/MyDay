@@ -49,6 +49,8 @@ import com.myday.app.data.CategoryEntity
 import com.myday.app.data.TaskEntity
 import com.myday.app.ui.theme.PriorityColors
 import com.myday.app.util.Fmt
+import com.myday.app.util.TaskTime
+import androidx.compose.material.icons.rounded.Brightness2
 
 @Composable
 fun CompleteToggle(done: Boolean, color: Color, onClick: () -> Unit) {
@@ -133,6 +135,7 @@ fun TaskCard(
                         val cc = category.color()
                         MetaChip(CategoryIcons.get(category.iconKey), category.name, cc)
                     }
+                    TaskTime.anchorLabel(task)?.let { MetaChip(Icons.Rounded.Brightness2, it, cs.tertiary) }
                     if (task.isRecurring) MetaChip(Icons.Rounded.Repeat, task.repeatType.label, cs.tertiary)
                     if (task.alarmEnabled && !task.isCompleted) MetaChip(Icons.Rounded.Alarm, "منبه", cs.secondary)
                 }

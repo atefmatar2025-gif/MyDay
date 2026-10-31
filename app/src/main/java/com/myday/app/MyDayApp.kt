@@ -8,6 +8,7 @@ import com.myday.app.alarm.NotificationHelper
 import com.myday.app.backup.BackupManager
 import com.myday.app.data.AppDatabase
 import com.myday.app.data.TaskRepository
+import com.myday.app.prayer.PrayerStore
 import com.myday.app.settings.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +30,7 @@ class MyDayApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        PrayerStore.init(this)
         NotificationHelper.createChannels(this)
         AlarmSyncWorker.enqueue(this)
     }

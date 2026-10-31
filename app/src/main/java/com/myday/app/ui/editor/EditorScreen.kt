@@ -90,6 +90,9 @@ import com.myday.app.ui.theme.PriorityColors
 import com.myday.app.ui.theme.isAppInDarkTheme
 import com.myday.app.util.Fmt
 import com.myday.app.util.SoundUtils
+import com.myday.app.util.TaskTime
+import com.myday.app.prayer.Prayer
+import com.myday.app.prayer.PrayerConfig
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -101,7 +104,9 @@ fun EditorScreen(
     settings: AppSettings,
     onBack: () -> Unit,
     onSaved: (Long) -> Unit,
+    onOpenPrayerSettings: () -> Unit,
 ) {
+    val prayerCfg by appVm.prayerConfig.collectAsStateWithLifecycle()
     val vm: EditorViewModel = viewModel()
     val s by vm.state.collectAsStateWithLifecycle()
     val categories by appVm.categories.collectAsStateWithLifecycle()
@@ -138,6 +143,7 @@ fun EditorScreen(
         when (vm.save(force) { id -> onSaved(id) }) {
             SaveResult.NEED_TITLE -> appVm.message("اكتب عنوان المهمة أولاً")
             SaveResult.PAST_TIME -> showPastDialog = true
+            SaveResult.NEED_LOCATION -> appVm.message("حدد مدينتك أولاً لحساب أوقات الصلاة")
             SaveResult.SAVED -> Unit
         }
     }
@@ -171,9 +177,25 @@ fun EditorScreen(
             )
 
             Section("الموعد")
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PickerTile(Icons.Rounded.CalendarMonth, "التاريخ", Fmt.relativeDay(s.dueAt), Modifier.weight(1f)) { showDate = true }
-                PickerTile(Icons.Rounded.Schedule, "الوقت", Fmt.time(s.dueAt, settings.use24h), Modifier.weight(1f)) { showTime = true }
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                SegmentedButton(
+                    selected = !s.prayerMode, onClick = { vm.update { it.copy(prayerMode = false) } },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2)
+                ) { Text("وقت محدد") }
+                SegmentedButton(
+                    selected = s.prayerMode, onClick = { vm.update { it.copy(prayerMode = true) } },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2)
+                ) { Text("مرتبط بالصلاة") }
+            }
+            if (!s.prayerMode) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PickerTile(Icons.Rounded.CalendarMonth, "التاريخ", Fmt.relativeDay(s.dueAt), Modifier.weight(1f)) { showDate = true }
+                    PickerTile(Icons.Rounded.Schedule, "الوقت", Fmt.time(s.dueAt, settings.use24h), Modifier.weight(1f)) { showTime = true }
+                }
+            } else {
+                PrayerTimePicker(s, prayerCfg, settings.use24h, onDate = { showDate = true }, onOpenPrayerSettings = onOpenPrayerSettings) { f ->
+                    vm.update(f)
+                }
             }
 
             Section("الأولوية")
@@ -308,12 +330,85 @@ fun EditorScreen(
             title = { Text("الموعد في الماضي") },
             text = { Text("الوقت المحدد قد مضى، لذلك لن يرن المنبه. هل تريد الحفظ على أي حال؟") },
             confirmButton = { TextButton(onClick = { showPastDialog = false; trySave(true) }) { Text("حفظ") } },
-            dismissButton = { TextButton(onClick = { showPastDialog = false; showTime = true }) { Text("تغيير الوقت") } }
+            dismissButton = {
+                TextButton(onClick = { showPastDialog = false; if (s.prayerMode) showDate = true else showTime = true }) {
+                    Text(if (s.prayerMode) "تغيير اليوم" else "تغيير الوقت")
+                }
+            }
         )
     }
     if (showNewCategory) {
         QuickCategoryDialog(onDismiss = { showNewCategory = false }) { name, color ->
             appVm.saveCategory(CategoryEntity(name = name, colorArgb = color, iconKey = "star"))
+        }
+    }
+}
+
+private val OFFSETS = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120)
+
+/** اختيار موعد نسبي لصلاة: «بعد العصر بـ 30 د». */
+@Composable
+private fun PrayerTimePicker(
+    s: EditorState,
+    cfg: PrayerConfig?,
+    use24h: Boolean,
+    onDate: () -> Unit,
+    onOpenPrayerSettings: () -> Unit,
+    update: ((EditorState) -> EditorState) -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    if (cfg == null) {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(cs.tertiaryContainer).padding(14.dp)
+        ) {
+            Text("حدد مدينتك أولاً", style = MaterialTheme.typography.titleSmall, color = cs.onTertiaryContainer)
+            Text("نحتاجها لحساب أوقات الصلاة على هاتفك دون إنترنت.", style = MaterialTheme.typography.bodySmall, color = cs.onTertiaryContainer)
+            TextButton(onClick = onOpenPrayerSettings) { Text("اختيار المدينة") }
+        }
+        return
+    }
+    PickerTile(Icons.Rounded.CalendarMonth, "اليوم", Fmt.relativeDay(s.dueAt), Modifier.fillMaxWidth(), onDate)
+    Spacer(Modifier.height(10.dp))
+    Text("الصلاة", style = MaterialTheme.typography.labelLarge)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Prayer.entries.forEach { p ->
+            FilterChip(selected = s.prayer == p, onClick = { update { it.copy(prayer = p) } }, label = { Text(p.label) })
+        }
+    }
+    Text("التوقيت", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(-1 to "قبل", 0 to "عند الأذان", 1 to "بعد").forEach { (v, label) ->
+            FilterChip(selected = s.relation == v, onClick = { update { it.copy(relation = v) } }, label = { Text(label) })
+        }
+    }
+    if (s.relation != 0) {
+        Text("بمقدار", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OFFSETS.forEach { m ->
+                FilterChip(
+                    selected = s.offsetAbs == m, onClick = { update { it.copy(offsetAbs = m) } },
+                    label = { Text(if (m < 60) "$m د" else if (m == 60) "ساعة" else if (m == 90) "ساعة ونصف" else "ساعتان") }
+                )
+            }
+        }
+    }
+    val due = s.effectiveDueAt(cfg)
+    Row(
+        Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(16.dp))
+            .background(cs.primaryContainer).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Rounded.Schedule, null, tint = cs.onPrimaryContainer)
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(TaskTime.anchorLabel(s.prayer, s.offsetMin), style = MaterialTheme.typography.titleSmall, color = cs.onPrimaryContainer)
+            Text(
+                if (due != null) {
+                    "الموعد: ${Fmt.dateTime(due, use24h)}" +
+                        (if (s.repeatType != RepeatType.NONE) " ثم يتغير تلقائياً مع وقت الصلاة" else "")
+                } else "تعذر حساب الوقت لهذا الموقع",
+                style = MaterialTheme.typography.bodySmall, color = cs.onPrimaryContainer
+            )
         }
     }
 }

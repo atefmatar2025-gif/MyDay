@@ -74,6 +74,10 @@ data class TaskEntity(
     val maxRepeats: Int = 3,
     val snoozedUntil: Long? = null,
     val ringAttempt: Int = 0,
+    /** اسم الصلاة المرتبطة (FAJR..ISHA) أو null لوقت ثابت */
+    val anchorPrayer: String? = null,
+    /** الإزاحة بالدقائق عن الصلاة: سالب = قبل، موجب = بعد */
+    @ColumnInfo(defaultValue = "0") val anchorOffsetMin: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
@@ -101,3 +105,5 @@ data class CompletionEntity(
     val completedAt: Long,
     @ColumnInfo(defaultValue = "1") val priorityLevel: Int = 1,
 )
+
+val TaskEntity.isPrayerAnchored: Boolean get() = anchorPrayer != null

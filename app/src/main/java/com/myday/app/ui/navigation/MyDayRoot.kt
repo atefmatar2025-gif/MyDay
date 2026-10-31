@@ -48,6 +48,7 @@ import com.myday.app.ui.detail.TaskDetailScreen
 import com.myday.app.ui.editor.EditorScreen
 import com.myday.app.ui.home.HomeScreen
 import com.myday.app.ui.permissions.PermissionsScreen
+import com.myday.app.ui.prayer.PrayerSettingsScreen
 import com.myday.app.ui.settings.SettingsScreen
 import com.myday.app.ui.stats.StatsScreen
 import com.myday.app.ui.tasks.TasksScreen
@@ -64,6 +65,7 @@ object Routes {
     const val CATEGORIES = "categories"
     const val PERMISSIONS = "permissions"
     const val WELCOME = "welcome"
+    const val PRAYER = "prayer"
     const val DETAIL = "task/{id}"
     const val EDITOR = "editor?taskId={taskId}&copyFrom={copyFrom}&date={date}"
 
@@ -160,9 +162,11 @@ fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>) {
                     onOpenTask = { nav.navigate(Routes.detail(it)) },
                     onAddTask = { nav.navigate(Routes.newTask()) },
                     onSeeAll = { nav.navigateTopLevel(Routes.TASKS) },
-                    onOpenPermissions = { nav.navigate(Routes.PERMISSIONS) }
+                    onOpenPermissions = { nav.navigate(Routes.PERMISSIONS) },
+                    onOpenPrayer = { nav.navigate(Routes.PRAYER) }
                 )
             }
+            composable(Routes.PRAYER) { PrayerSettingsScreen(vm, settings, onBack = { nav.popBackStack() }) }
             composable(Routes.TASKS) {
                 TasksScreen(
                     vm, settings,
@@ -183,7 +187,8 @@ fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>) {
                 SettingsScreen(
                     vm, settings,
                     onOpenCategories = { nav.navigate(Routes.CATEGORIES) },
-                    onOpenPermissions = { nav.navigate(Routes.PERMISSIONS) }
+                    onOpenPermissions = { nav.navigate(Routes.PERMISSIONS) },
+                    onOpenPrayer = { nav.navigate(Routes.PRAYER) }
                 )
             }
             composable(Routes.CATEGORIES) { CategoriesScreen(vm, onBack = { nav.popBackStack() }) }
@@ -213,6 +218,7 @@ fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>) {
                 EditorScreen(
                     appVm = vm, settings = settings,
                     onBack = { nav.popBackStack() },
+                    onOpenPrayerSettings = { nav.navigate(Routes.PRAYER) },
                     onSaved = { id ->
                         // بعد الحفظ: نعود، ولمهمة جديدة نفتح تفاصيلها
                         val wasNew = nav.currentBackStackEntry?.arguments?.getLong("taskId", -1L) == -1L
