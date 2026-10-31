@@ -40,6 +40,13 @@ data class AppSettings(
     /** معرّف الشريحة للإرسال؛ -1 = الشريحة الافتراضية في الهاتف */
     val careSimSubId: Int = -1,
     val careSimLabel: String = "",
+    /** دفتر العبارات: رسائل جاهزة تُستخدم بلمسة */
+    val phrases: List<String> = DEFAULT_PHRASES,
+)
+
+val DEFAULT_PHRASES = listOf(
+    "أنا في الطريق", "وصلت بالسلامة", "سأتأخر قليلاً", "اتصل بي عندما تستطيع",
+    "لا تنسَ موعدنا", "كيف حالك؟ اشتقت لك",
 )
 
 data class CareContact(val name: String, val phone: String)
@@ -72,6 +79,7 @@ class SettingsRepository(private val context: Context) {
         val CARE_MESSAGE = stringPreferencesKey("care_message")
         val CARE_SIM = intPreferencesKey("care_sim_sub_id")
         val CARE_SIM_LABEL = stringPreferencesKey("care_sim_label")
+        val PHRASES = stringPreferencesKey("phrases")
     }
 
     private fun encodeContacts(list: List<CareContact>) =
@@ -107,6 +115,7 @@ class SettingsRepository(private val context: Context) {
                 careMessage = p[Keys.CARE_MESSAGE]?.takeIf { it.isNotBlank() } ?: d.careMessage,
                 careSimSubId = p[Keys.CARE_SIM] ?: d.careSimSubId,
                 careSimLabel = p[Keys.CARE_SIM_LABEL] ?: d.careSimLabel,
+                phrases = p[Keys.PHRASES]?.split('\n')?.filter { it.isNotBlank() } ?: d.phrases,
             )
         }
 
@@ -133,6 +142,17 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCareSim(subId: Int, label: String) = context.dataStore.edit {
         it[Keys.CARE_SIM] = subId
         it[Keys.CARE_SIM_LABEL] = label
+    }
+    /** يضيف عبارة جديدة لأول الدفتر (بلا تكرار، 15 عبارة كحد أقصى). */
+    suspend fun rememberPhrase(text: String) = context.dataStore.edit {
+        val t = text.trim().replace('\n', ' ')
+        if (t.length < 2 || t.length > 160) return@edit
+        val current = it[Keys.PHRASES]?.split('\n')?.filter { s -> s.isNotBlank() } ?: DEFAULT_PHRASES
+        it[Keys.PHRASES] = (listOf(t) + current.filter { s -> s != t }).take(15).joinToString("\n")
+    }
+    suspend fun removePhrase(text: String) = context.dataStore.edit {
+        val current = it[Keys.PHRASES]?.split('\n')?.filter { s -> s.isNotBlank() } ?: DEFAULT_PHRASES
+        it[Keys.PHRASES] = current.filter { s -> s != text }.joinToString("\n")
     }
     suspend fun setOnboardingDone(v: Boolean) = context.dataStore.edit { it[Keys.ONBOARDING] = v }
 }

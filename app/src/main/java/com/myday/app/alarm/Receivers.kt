@@ -58,6 +58,10 @@ class AlarmActionReceiver : BroadcastReceiver() {
         val action = intent.action
         val minutes = intent.getIntExtra(EXTRA_MINUTES, 5)
         // إيقاف الصوت فوراً قبل أي عمل على قاعدة البيانات
+        if (action == ACTION_CANCEL_SEND) {
+            if (AlarmState.autoSend.value?.taskId == taskId) AlarmState.cancelAutoSend()
+            return
+        }
         val ringing = AlarmState.ringing.value
         if (ringing == null || ringing.taskId == taskId) AlarmService.stop(app)
         runAsync {
@@ -66,6 +70,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
                 ACTION_STOP -> repo.stopRinging(taskId)
                 ACTION_SNOOZE -> repo.snooze(taskId, minutes)
                 ACTION_COMPLETE -> repo.complete(taskId)
+                ACTION_SEND_NOW -> repo.executeSms(taskId)
             }
             NotificationHelper.cancelForTask(app, taskId)
         }
@@ -75,6 +80,8 @@ class AlarmActionReceiver : BroadcastReceiver() {
         const val ACTION_STOP = "com.myday.app.action.STOP"
         const val ACTION_SNOOZE = "com.myday.app.action.SNOOZE"
         const val ACTION_COMPLETE = "com.myday.app.action.COMPLETE"
+        const val ACTION_SEND_NOW = "com.myday.app.action.SEND_NOW"
+        const val ACTION_CANCEL_SEND = "com.myday.app.action.CANCEL_SEND"
         const val EXTRA_TASK_ID = "task_id"
         const val EXTRA_MINUTES = "minutes"
     }

@@ -72,6 +72,9 @@ import com.myday.app.ui.theme.isAppInDarkTheme
 import com.myday.app.util.Fmt
 import com.myday.app.util.TaskTime
 import com.myday.app.data.TaskEntity
+import com.myday.app.data.TaskAction
+import com.myday.app.data.action
+import androidx.compose.material.icons.rounded.Send
 import com.myday.app.data.CompletionEntity
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Brightness2
@@ -167,6 +170,16 @@ fun TaskDetailScreen(
                 "التصنيف", category?.name ?: "بلا تصنيف", category?.color()
             )
             InfoRow(Icons.Rounded.Repeat, "التكرار", task.repeatType.label)
+            task.action?.let { a ->
+                val who = task.actionContactName ?: task.actionPhone.orEmpty()
+                val detail = when (a) {
+                    TaskAction.SMS -> "رسالة إلى $who: «${task.actionMessage.orEmpty()}»" +
+                        (if (task.actionAutoSend) " — تُرسل تلقائياً" else " — بضغطة منك")
+                    TaskAction.WHATSAPP -> "واتساب إلى $who" + (task.actionMessage?.let { ": «$it»" } ?: "")
+                    TaskAction.CALL -> "اتصال بـ $who"
+                }
+                InfoRow(Icons.Rounded.Send, "تُنجز نفسها", detail)
+            }
             if (task.alarmEnabled) {
                 val next = AlarmTimes.nextAlarm(task, System.currentTimeMillis())
                 InfoRow(Icons.Rounded.Alarm, "المنبه", if (next != null) "سيرن ${Fmt.dateTime(next, settings.use24h)}" else "لا يوجد رنين قادم")

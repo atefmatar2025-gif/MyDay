@@ -2,6 +2,7 @@ package com.myday.app.nlp
 
 import com.myday.app.data.Priority
 import com.myday.app.data.RepeatType
+import com.myday.app.data.TaskAction
 import com.myday.app.prayer.Prayer
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -27,6 +28,12 @@ data class ParsedTask(
     val categoryName: String? = null,
     /** الأجزاء التي فُهمت، لعرضها للمستخدم */
     val understood: List<String> = emptyList(),
+    /** فعل تنفّذه المهمة: رسالة SMS أو واتساب أو اتصال */
+    val action: TaskAction? = null,
+    /** اسم الشخص كما قيل (للبحث في جهات الاتصال) */
+    val contactName: String? = null,
+    /** نص الرسالة المقترح */
+    val message: String? = null,
 )
 
 /**
@@ -223,6 +230,14 @@ object ArabicTaskParser {
         // 1) كلمات الطلب في البداية
         var s = 0
         while (s < toks.size && toks[s].n in startFillers) { toks[s].used = true; s++ }
+
+        // 1.5) الأفعال: «ابعت رسالة لمعاذ قله ...» / «اتصل بأبو محمد»
+        val act = detectAction(toks)
+        act?.let { understood += when (it.action) {
+            TaskAction.SMS -> "رسالة إلى ${it.name}"
+            TaskAction.WHATSAPP -> "واتساب إلى ${it.name}"
+            TaskAction.CALL -> "اتصال بـ ${it.name}"
+        } }
 
         // 2) الوقت الصريح أولاً حتى نفرّق بين «بعد الظهر» كفترة و«بعد الظهر» كصلاة
         for (i in toks.indices) {
@@ -464,6 +479,9 @@ object ArabicTaskParser {
         while (remaining.isNotEmpty() && remaining.first().n in leadingConnectors) remaining.removeAt(0)
         while (remaining.isNotEmpty() && remaining.last().n in trailingConnectors) remaining.removeAt(remaining.size - 1)
         var title = remaining.joinToString(" ") { it.raw }.trim()
+        if (act != null && act.action != TaskAction.CALL) {
+            title = (if (act.action == TaskAction.WHATSAPP) "واتساب إلى " else "رسالة إلى ") + act.name
+        }
         if (title.isEmpty()) title = "مهمة"
 
         val titleNorm = remaining.map { it.n }
@@ -485,8 +503,125 @@ object ArabicTaskParser {
             isCare = isCare,
             categoryName = category,
             understood = understood.distinct(),
+            action = act?.action,
+            contactName = act?.name,
+            message = act?.message,
         )
     }
+
+    // ---------------- الأفعال ----------------
+
+    private class ActionMatch(val action: TaskAction, val name: String, val message: String?)
+
+    private val sendVerbs = setOf("ابعت", "ابعث", "ارسل", "بعت", "بعث", "ابعتله", "ابعتلها", "ابعثله", "ارسله", "اكتب", "ابعتو", "ابعتي", "ارسلي")
+    private val msgNouns = setOf("رساله", "رسايل", "مسج", "مسچ", "ماسج", "مسيج", "sms", "رسالتين")
+    private val waWords = setOf("واتس", "واتساب", "الواتس", "الواتساب", "عالواتس", "بالواتس", "عالواتساب", "بالواتساب", "whatsapp")
+    private val notNames = setOf("حد", "احد", "واحد", "حدا", "الكل", "البنك", "الشركه", "المدرسه", "الدكتور", "المحل", "الشغل")
+    private val messageStops = setOf("الساعه", "الساعة", "بعد", "قبل", "كل", "يوم", "عند")
+    private val callVerbs = setOf("اتصل", "كلم", "رن", "اتصال", "حاكي", "كلمي", "اتصلي", "احكي")
+    private val bodyMarkers = setOf("قله", "قوله", "قلو", "قولو", "قلها", "قولها", "قللو", "قللها", "انو", "انه", "انها", "تقول", "يقول", "فيها", "مضمونها", "نصها", "بانو", "بانه", "اقله", "اقلها", ":")
+    private val nameJoiners = setOf("ابو", "ام", "ابن", "بنت", "عمي", "خالي", "عمو", "خالو", "دكتور", "الدكتور", "استاذ", "الاستاذ", "الحج", "الحاج", "حجه", "الشيخ", "شيخ", "ست", "عمتي", "خالتي")
+
+    /** يقرأ اسم الشخص بدءاً من [i]؛ يرجع (الاسم الخام، عدد الكلمات). */
+    private fun readName(t: List<Tok>, i: Int, stripPrefix: Boolean): Pair<String, Int>? {
+        val first = t.getOrNull(i) ?: return null
+        var raw = first.raw
+        var n = first.n
+        if (stripPrefix) {
+            val p = listOf("لل", "ل", "ب", "ع").firstOrNull { n.startsWith(it) && n.length > it.length + 1 } ?: return null
+            n = n.removePrefix(p)
+            raw = raw.drop(p.length)
+        }
+        if (n in msgNouns || n in waWords || n in bodyMarkers || n.isBlank()) return null
+        if (n in nameJoiners) {
+            val second = t.getOrNull(i + 1) ?: return raw to 1
+            return "$raw ${second.raw}" to 2
+        }
+        return raw to 1
+    }
+
+    private fun detectAction(t: List<Tok>): ActionMatch? {
+        // إرسال رسالة
+        val v = t.indexOfFirst { !it.used && it.n in sendVerbs }
+        if (v >= 0) {
+            var name: Pair<String, Int>? = null
+            var nameAt = -1
+            var wa = false
+            var hasNoun = false
+            var j = v + 1
+            val used = mutableListOf(v)
+            var guard = 0
+            while (j < t.size && guard++ < 6) {
+                val n = t[j].n
+                when {
+                    n in msgNouns -> { hasNoun = true; used += j; j++ }
+                    n in waWords -> { wa = true; used += j; j++ }
+                    (n == "الى" || n == "ل" || n == "لـ") && name == null -> {
+                        readName(t, j + 1, false)?.let { name = it; nameAt = j + 1; used += j; repeat(it.second) { k -> used += j + 1 + k } }
+                        j += 1 + (name?.second ?: 0)
+                    }
+                    name == null && (n.startsWith("ل") || n.startsWith("لل")) && n !in msgNouns -> {
+                        val r = readName(t, j, true)
+                        if (r != null) { name = r; nameAt = j; repeat(r.second) { k -> used += j + k }; j += r.second } else break
+                    }
+                    else -> break
+                }
+                if (name != null && (hasNoun || wa)) {
+                    // قد يأتي «رساله» أو «عالواتس» بعد الاسم
+                    while (j < t.size && (t[j].n in msgNouns || t[j].n in waWords)) {
+                        if (t[j].n in waWords) wa = true else hasNoun = true
+                        used += j; j++
+                    }
+                    break
+                }
+            }
+            val nm = name
+            if (nm != null && normalize(nm.first) !in notNames) {
+                // نص الرسالة بعد «قله / انو / ...»
+                var message: String? = null
+                val m = (j until t.size).firstOrNull { k ->
+                    t[k].n in bodyMarkers || (t[k].n == "قول" && t.getOrNull(k + 1)?.n.let { it == "له" || it == "لها" })
+                }
+                if (m != null) {
+                    var start = if (t[m].n == "قول") m + 2 else m + 1
+                    while (start < t.size && t[start].n in bodyMarkers) start++
+                    if (start < t.size) {
+                        message = t.subList(start, t.size).joinToString(" ") { it.raw }.trim().ifBlank { null }
+                        for (k in m until t.size) t[k].used = true
+                    }
+                } else if (j < t.size) {
+                    // دون «قله»: النص بعد الاسم حتى أول كلمة تدل على موعد
+                    var end = j
+                    while (end < t.size && !isTimeWord(t[end].n)) end++
+                    if (end > j) {
+                        message = t.subList(j, end).joinToString(" ") { it.raw }.trim().ifBlank { null }
+                        for (k in j until end) t[k].used = true
+                    }
+                }
+                used.forEach { t[it].used = true }
+                return ActionMatch(if (wa) TaskAction.WHATSAPP else TaskAction.SMS, nm.first, message)
+            }
+        }
+        // اتصال: لا نستهلك الكلمات حتى يبقى العنوان «اتصل بأبو محمد»
+        val c = t.indexOfFirst { !it.used && it.n in callVerbs }
+        if (c >= 0) {
+            val nx = t.getOrNull(c + 1) ?: return null
+            val r = when {
+                nx.n == "على" || nx.n == "مع" -> readName(t, c + 2, false)
+                nx.n.startsWith("ب") || nx.n.startsWith("ع") -> readName(t, c + 1, true)
+                t[c].n == "كلم" || t[c].n == "كلمي" -> readName(t, c + 1, false)
+                else -> null
+            }
+            if (r != null && normalize(r.first) !in notNames) {
+                return ActionMatch(TaskAction.CALL, r.first, null)
+            }
+        }
+        return null
+    }
+
+    private fun isTimeWord(n: String): Boolean =
+        n in messageStops || n in todayWords || n in tomorrowWords || n in tonightWords ||
+            weekdayWords.containsKey(n) || n in morningWords || n in eveningWords || n in nightWords
 
     private fun nextWeekday(today: LocalDate, wd: DayOfWeek, now: LocalDateTime, hour: Int?, minute: Int): LocalDate {
         if (today.dayOfWeek == wd) {

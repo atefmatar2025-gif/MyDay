@@ -55,6 +55,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.myday.app.nlp.ArabicTaskParser
 import com.myday.app.nlp.QuickTaskBuilder
 import com.myday.app.ui.AppViewModel
+import com.myday.app.ui.ActionDraft
+import com.myday.app.ui.components.ActionEditor
+import com.myday.app.nlp.ContactMatch
+import com.myday.app.nlp.ContactsLookup
+import com.myday.app.data.TaskAction
+import android.Manifest
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.myday.app.util.Fmt
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
@@ -111,8 +123,40 @@ fun QuickAddSheet(
     val due = remember(parsed, prayerCfg) { parsed?.let { QuickTaskBuilder.resolveDue(it, now, prayerCfg) } }
     val needsCity = parsed?.prayer != null && parsed.relative == null && prayerCfg == null
 
+    // «المهمة التي تُنجز نفسها»: رسالة/واتساب/اتصال
+    val context = LocalContext.current
+    var actType by remember(parsed?.action) { mutableStateOf(parsed?.action) }
+    var actName by remember(parsed?.contactName) { mutableStateOf(parsed?.contactName.orEmpty()) }
+    var actPhone by remember(parsed?.contactName) { mutableStateOf("") }
+    var actMessage by remember(parsed?.message) { mutableStateOf(parsed?.message.orEmpty()) }
+    var actAuto by remember { mutableStateOf(true) }
+    var contactsGranted by remember { mutableStateOf(ContactsLookup.hasPermission(context)) }
+    var candidates by remember(parsed?.contactName) { mutableStateOf<List<ContactMatch>>(emptyList()) }
+    val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        contactsGranted = ok
+        if (!ok) vm.message("بدون هذا الإذن اختر الشخص يدوياً")
+    }
+    LaunchedEffect(parsed?.contactName, contactsGranted) {
+        val n = parsed?.contactName
+        if (n != null && contactsGranted) {
+            candidates = withContext(Dispatchers.IO) { ContactsLookup.find(context, n) }
+            if (actPhone.isBlank()) candidates.firstOrNull()?.let { actName = it.name; actPhone = it.phone }
+        }
+    }
+    fun actionDraft(): ActionDraft? =
+        actType?.takeIf { actPhone.isNotBlank() }?.let { ActionDraft(it, actPhone, actName, actMessage, actAuto) }
+    fun actionReady(): Boolean {
+        if (actType == null) return true
+        if (actPhone.isBlank()) { vm.message("اختر الشخص من جهات الاتصال"); return false }
+        if (actType == TaskAction.SMS && actMessage.isBlank()) { vm.message("اكتب نص الرسالة"); return false }
+        return true
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.padding(horizontal = 20.dp).navigationBarsPadding().imePadding().padding(bottom = 16.dp)) {
+        Column(
+            Modifier.padding(horizontal = 20.dp).navigationBarsPadding().imePadding()
+                .verticalScroll(rememberScrollState()).padding(bottom = 16.dp)
+        ) {
             Text("أضف مهمة بكلامك", style = MaterialTheme.typography.titleLarge)
             Text(
                 "اكتب أو تكلّم كما تتحدث عادةً، بالفصحى أو العامية.",
@@ -161,6 +205,41 @@ fun QuickAddSheet(
                         }
                     }
                 }
+                if (actType != null) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(14.dp)
+                    ) {
+                        Text("مهمة تُنجز نفسها", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        if (!contactsGranted && actPhone.isBlank() && !parsed.contactName.isNullOrBlank()) {
+                            TextButton(onClick = { contactsPermission.launch(Manifest.permission.READ_CONTACTS) }) {
+                                Text("ابحث عن «${parsed.contactName}» في جهات الاتصال")
+                            }
+                        }
+                        if (candidates.size > 1) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                candidates.forEach { c ->
+                                    FilterChip(
+                                        selected = c.phone == actPhone,
+                                        onClick = { actName = c.name; actPhone = c.phone },
+                                        label = { Text(c.name) }
+                                    )
+                                }
+                            }
+                        } else if (contactsGranted && candidates.isEmpty() && !parsed.contactName.isNullOrBlank() && actPhone.isBlank()) {
+                            Text("لم أجد «${parsed.contactName}» في جهاتك — اختره يدوياً",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        }
+                        ActionEditor(
+                            type = actType, onType = { actType = it },
+                            contactName = actName, phone = actPhone,
+                            onContact = { n, p -> actName = n; actPhone = p },
+                            message = actMessage, onMessage = { actMessage = it },
+                            autoSend = actAuto, onAutoSend = { actAuto = it },
+                            phrases = settings.phrases,
+                        )
+                    }
+                }
                 Spacer(Modifier.height(14.dp))
                 if (needsCity) {
                     Button(onClick = { onDismiss(); onOpenPrayerSettings() }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
@@ -168,13 +247,13 @@ fun QuickAddSheet(
                     }
                 } else {
                     Button(
-                        onClick = { if (vm.quickSave(parsed)) onDismiss() },
+                        onClick = { if (actionReady() && vm.quickSave(parsed, actionDraft())) onDismiss() },
                         modifier = Modifier.fillMaxWidth().height(52.dp)
                     ) { Text("إضافة المهمة") }
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
-                    onClick = { vm.prepareDraft(parsed); onDismiss(); onOpenDraft() },
+                    onClick = { vm.prepareDraft(parsed, actionDraft()); onDismiss(); onOpenDraft() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Rounded.Edit, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("تعديل التفاصيل قبل الحفظ")

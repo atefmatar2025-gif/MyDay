@@ -18,6 +18,7 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.myday.app.container
+import com.myday.app.data.autoSendsSms
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,6 +43,8 @@ class AlarmService : Service() {
     private var timeoutJob: Job? = null
     private var rampJob: Job? = null
     private var currentTaskId: Long? = null
+    private var sendJob: Job? = null
+    private var cancelWatchJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -63,6 +66,8 @@ class AlarmService : Service() {
         if (previous != null && previous != taskId) {
             // منبه جديد قاطع منبهاً يرن: نعامل السابق كعدم استجابة (سيعاد لاحقاً)
             stopPlayback()
+            sendJob?.cancel(); cancelWatchJob?.cancel()
+            AlarmState.cancelAutoSend()
             val repo = container.repository
             scope.launch(Dispatchers.IO + NonCancellable) { repo.onRingTimeout(previous) }
         }
@@ -82,13 +87,41 @@ class AlarmService : Service() {
         val settings = withContext(Dispatchers.IO) { container.settings.current() }
 
         AlarmState.set(RingingInfo(task.id, task.title, task.description, task.dueAt))
-        startInForeground(NotificationHelper.buildRingingNotification(this, task))
+        val autoSend = task.autoSendsSms
+        if (autoSend) AlarmState.setAutoSend(AutoSendInfo(task.id, System.currentTimeMillis() + AUTO_SEND_DELAY_MS))
+        startInForeground(NotificationHelper.buildRingingNotification(this, task, autoSendPending = autoSend))
 
         stopPlayback()
         startSound(task.soundUri ?: settings.defaultSoundUri, settings.gradualVolume)
         if (settings.vibrate) startVibration()
 
-        val duration = task.soundDurationSec.coerceIn(10, 600) * 1000L
+        // مهمة تُرسل نفسها: بعد العدّاد تُرسل الرسالة ما لم يُلغِها المستخدم
+        if (autoSend) {
+            sendJob?.cancel()
+            sendJob = scope.launch {
+                delay(AUTO_SEND_DELAY_MS)
+                if (AlarmState.autoSend.value?.taskId == taskId && currentTaskId == taskId) {
+                    cancelWatchJob?.cancel()
+                    AlarmState.cancelAutoSend()
+                    stopPlayback()
+                    withContext(Dispatchers.IO + NonCancellable) { repo.executeSms(taskId) }
+                    if (currentTaskId == taskId) finish()
+                }
+            }
+            // عند الإلغاء: تحديث الإشعار ليظهر زر الإيقاف بدل «إلغاء الإرسال»
+            cancelWatchJob?.cancel()
+            cancelWatchJob = scope.launch {
+                AlarmState.autoSend.collect { info ->
+                    if (info == null && currentTaskId == taskId && sendJob?.isActive == true) {
+                        sendJob?.cancel()
+                        startInForeground(NotificationHelper.buildRingingNotification(this@AlarmService, task, autoSendPending = false))
+                    }
+                }
+            }
+        }
+
+        val minDuration = if (autoSend) AUTO_SEND_DELAY_MS + 10_000L else 0L
+        val duration = maxOf(task.soundDurationSec.coerceIn(10, 600) * 1000L, minDuration)
         timeoutJob = scope.launch {
             delay(duration)
             onTimeout(taskId)
@@ -187,6 +220,8 @@ class AlarmService : Service() {
 
     private fun finish() {
         currentTaskId = null
+        sendJob?.cancel(); cancelWatchJob?.cancel()
+        AlarmState.cancelAutoSend()
         stopPlayback()
         AlarmState.set(null)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -195,6 +230,7 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         stopPlayback()
+        AlarmState.cancelAutoSend()
         AlarmState.set(null)
         scope.cancel()
         super.onDestroy()
@@ -204,6 +240,7 @@ class AlarmService : Service() {
         private const val TAG = "AlarmService"
         const val ACTION_START = "com.myday.app.action.START_RINGING"
         const val EXTRA_TASK_ID = "task_id"
+        const val AUTO_SEND_DELAY_MS = 30_000L
 
         /** يبدأ الرنين؛ وإن منع النظام الخدمة الأمامية نعرض إشعار منبه احتياطي بصوت. */
         fun start(context: Context, taskId: Long) {

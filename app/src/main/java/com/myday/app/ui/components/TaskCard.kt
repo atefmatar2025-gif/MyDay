@@ -47,6 +47,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.myday.app.data.CategoryEntity
 import com.myday.app.data.TaskEntity
+import com.myday.app.data.TaskAction
+import com.myday.app.data.action
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Send
 import com.myday.app.ui.theme.PriorityColors
 import com.myday.app.util.Fmt
 import com.myday.app.util.TaskTime
@@ -135,6 +139,14 @@ fun TaskCard(
                     if (category != null) {
                         val cc = category.color()
                         MetaChip(CategoryIcons.get(category.iconKey), category.name, cc)
+                    }
+                    task.action?.let { a ->
+                        val who = task.actionContactName ?: task.actionPhone.orEmpty()
+                        MetaChip(
+                            if (a == TaskAction.CALL) Icons.Rounded.Call else Icons.Rounded.Send,
+                            when (a) { TaskAction.SMS -> "رسالة لـ $who"; TaskAction.WHATSAPP -> "واتساب لـ $who"; TaskAction.CALL -> "اتصال بـ $who" },
+                            cs.primary
+                        )
                     }
                     if (task.isCare) MetaChip(Icons.Rounded.Favorite, "رعاية", cs.error)
                     TaskTime.anchorLabel(task)?.let { MetaChip(Icons.Rounded.Brightness2, it, cs.tertiary) }

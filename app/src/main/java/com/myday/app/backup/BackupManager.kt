@@ -79,6 +79,9 @@ class BackupManager(private val context: Context, private val repo: TaskReposito
         .put("createdAt", createdAt).put("updatedAt", updatedAt)
         .put("anchorPrayer", anchorPrayer ?: JSONObject.NULL).put("anchorOffsetMin", anchorOffsetMin)
         .put("isCare", isCare)
+        .put("actionType", actionType ?: JSONObject.NULL).put("actionPhone", actionPhone ?: JSONObject.NULL)
+        .put("actionContactName", actionContactName ?: JSONObject.NULL).put("actionMessage", actionMessage ?: JSONObject.NULL)
+        .put("actionAutoSend", actionAutoSend)
 
     private fun taskFrom(o: JSONObject) = TaskEntity(
         id = o.getLong("id"),
@@ -104,6 +107,11 @@ class BackupManager(private val context: Context, private val repo: TaskReposito
         anchorPrayer = o.optStringOrNull("anchorPrayer"),
         anchorOffsetMin = o.optInt("anchorOffsetMin", 0),
         isCare = o.optBoolean("isCare", false),
+        actionType = o.optStringOrNull("actionType"),
+        actionPhone = o.optStringOrNull("actionPhone"),
+        actionContactName = o.optStringOrNull("actionContactName"),
+        actionMessage = o.optStringOrNull("actionMessage"),
+        actionAutoSend = o.optBoolean("actionAutoSend", true),
     )
 
     private fun CompletionEntity.toJson() = JSONObject()

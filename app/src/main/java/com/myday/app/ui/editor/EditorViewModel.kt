@@ -8,6 +8,7 @@ import com.myday.app.container
 import com.myday.app.data.Priority
 import com.myday.app.data.RepeatType
 import com.myday.app.data.TaskEntity
+import com.myday.app.data.TaskAction
 import com.myday.app.util.Fmt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +54,11 @@ data class EditorState(
     val relation: Int = 1,
     val offsetAbs: Int = 30,
     val isCare: Boolean = false,
+    val actionType: TaskAction? = null,
+    val actionPhone: String = "",
+    val actionContactName: String = "",
+    val actionMessage: String = "",
+    val actionAutoSend: Boolean = true,
 ) {
     val offsetMin: Int get() = if (relation == 0) 0 else relation * offsetAbs
 
@@ -64,7 +70,7 @@ data class EditorState(
         if (prayerMode) TaskTime.prayerTime(date, prayer, offsetMin, cfg) else dueAt
 }
 
-enum class SaveResult { SAVED, NEED_TITLE, PAST_TIME, NEED_LOCATION }
+enum class SaveResult { SAVED, NEED_TITLE, PAST_TIME, NEED_LOCATION, NEED_CONTACT, NEED_MESSAGE }
 
 class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewModel(app) {
 
@@ -126,6 +132,11 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
                     repeatIntervalMin = source.repeatIntervalMin,
                     maxRepeats = source.maxRepeats,
                     isCare = source.isCare,
+                    actionType = TaskAction.fromName(source.actionType),
+                    actionPhone = source.actionPhone.orEmpty(),
+                    actionContactName = source.actionContactName.orEmpty(),
+                    actionMessage = source.actionMessage.orEmpty(),
+                    actionAutoSend = source.actionAutoSend,
                     prayerMode = anchored != null,
                     prayer = anchored ?: Prayer.ASR,
                     relation = source.anchorOffsetMin.sign,
@@ -148,6 +159,8 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
             _state.update { it.copy(titleError = true) }
             return SaveResult.NEED_TITLE
         }
+        if (s.actionType != null && s.actionPhone.isBlank()) return SaveResult.NEED_CONTACT
+        if (s.actionType == TaskAction.SMS && s.actionMessage.isBlank()) return SaveResult.NEED_MESSAGE
         val due = s.effectiveDueAt() ?: return SaveResult.NEED_LOCATION
         val originalDue = s.original?.dueAt
         if (!force && s.repeatType == RepeatType.NONE && due <= System.currentTimeMillis() &&
@@ -166,6 +179,11 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
             anchorPrayer = if (s.prayerMode) s.prayer.name else null,
             anchorOffsetMin = if (s.prayerMode) s.offsetMin else 0,
             isCare = s.isCare,
+            actionType = s.actionType?.name,
+            actionPhone = s.actionPhone.trim().ifBlank { null },
+            actionContactName = s.actionContactName.trim().ifBlank { null },
+            actionMessage = s.actionMessage.trim().ifBlank { null },
+            actionAutoSend = s.actionAutoSend,
             priority = s.priority,
             categoryId = s.categoryId,
             repeatType = s.repeatType,
@@ -185,6 +203,7 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
         viewModelScope.launch {
             try {
                 val id = repo.saveTask(task)
+                task.actionMessage?.let { settingsRepo.rememberPhrase(it) }
                 onDone(id)
             } finally {
                 _state.update { it.copy(saving = false) }

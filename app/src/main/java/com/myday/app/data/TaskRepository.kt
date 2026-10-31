@@ -227,6 +227,27 @@ class TaskRepository(
         }
     }
 
+    /**
+     * تنفيذ رسالة SMS لمهمة «تُنجز نفسها»: إرسال ثم تعليمها منجزة.
+     * يرجع true عند تسليم الرسالة لنظام الرسائل.
+     */
+    suspend fun executeSms(id: Long, overrideText: String? = null): Boolean {
+        val task = taskDao.getById(id) ?: return false
+        val phone = task.actionPhone ?: return false
+        val text = (overrideText ?: task.actionMessage)?.trim().orEmpty()
+        if (text.isEmpty()) return false
+        val s = settings.current()
+        val ok = CareNotifier.send(context, phone, text, s.careSimSubId)
+        if (ok) {
+            complete(id)
+            settings.rememberPhrase(text)
+            NotificationHelper.showActionResult(context, task, "أُرسلت الرسالة إلى ${task.actionContactName ?: phone}: «$text»")
+        } else {
+            NotificationHelper.showActionResult(context, task, "تعذر إرسال الرسالة إلى ${task.actionContactName ?: phone} — تحقق من إذن الرسائل والشريحة")
+        }
+        return ok
+    }
+
     // ---------------- التصنيفات ----------------
 
     suspend fun saveCategory(category: CategoryEntity): Long =

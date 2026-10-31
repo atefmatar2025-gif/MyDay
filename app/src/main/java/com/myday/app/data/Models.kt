@@ -80,6 +80,13 @@ data class TaskEntity(
     @ColumnInfo(defaultValue = "0") val anchorOffsetMin: Int = 0,
     /** مهمة رعاية (دواء/أمر حرج): تأكيد إلزامي وإبلاغ العائلة عند عدم الاستجابة */
     @ColumnInfo(defaultValue = "0") val isCare: Boolean = false,
+    /** فعل تنفّذه المهمة بنفسها في موعدها: SMS / WHATSAPP / CALL */
+    val actionType: String? = null,
+    val actionPhone: String? = null,
+    val actionContactName: String? = null,
+    val actionMessage: String? = null,
+    /** للرسائل النصية: إرسال تلقائي بعد عدّاد تنازلي ما لم يُلغَ */
+    @ColumnInfo(defaultValue = "1") val actionAutoSend: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
@@ -109,3 +116,16 @@ data class CompletionEntity(
 )
 
 val TaskEntity.isPrayerAnchored: Boolean get() = anchorPrayer != null
+
+enum class TaskAction(val label: String) {
+    SMS("رسالة SMS"), WHATSAPP("رسالة واتساب"), CALL("اتصال");
+
+    companion object {
+        fun fromName(n: String?): TaskAction? = entries.firstOrNull { it.name == n }
+    }
+}
+
+val TaskEntity.action: TaskAction? get() = TaskAction.fromName(actionType).takeIf { !actionPhone.isNullOrBlank() }
+
+/** هل ستُرسل هذه المهمة رسالة SMS تلقائياً عند رنينها؟ */
+val TaskEntity.autoSendsSms: Boolean get() = action == TaskAction.SMS && actionAutoSend && !actionMessage.isNullOrBlank()

@@ -131,4 +131,46 @@ class ParserTest {
         assertEquals(RepeatType.DAILY, r.repeat)
         assertEquals("العبادة", r.categoryName)
     }
+
+    // ---------- المهام التي تُنجز نفسها ----------
+
+    @Test fun smsWithBody() {
+        val r = p("ابعت رسالة لمعاذ قله اني متأخر نص ساعة")
+        assertEquals(com.myday.app.data.TaskAction.SMS, r.action)
+        assertEquals("معاذ", r.contactName)
+        assertEquals("اني متأخر نص ساعة", r.message)
+        assertEquals("رسالة إلى معاذ", r.title)
+        assertNull(r.relative)
+    }
+
+    @Test fun whatsappTomorrowNine() {
+        val r = p("بكرا الساعة 9 ابعت لمعاذ عالواتس انو انا متأخر")
+        assertEquals(com.myday.app.data.TaskAction.WHATSAPP, r.action)
+        assertEquals("معاذ", r.contactName)
+        assertEquals("انا متأخر", r.message)
+        assertEquals(today.plusDays(1), r.date)
+        assertEquals(LocalTime.of(9, 0), r.time)
+    }
+
+    @Test fun dailySmsToMomWithoutMarker() {
+        val r = p("كل يوم الساعة 2 ابعت لأمي وصلت الدوام")
+        assertEquals(com.myday.app.data.TaskAction.SMS, r.action)
+        assertEquals("أمي", r.contactName)
+        assertEquals("وصلت الدوام", r.message)
+        assertEquals(RepeatType.DAILY, r.repeat)
+        assertEquals(LocalTime.of(14, 0), r.time)
+    }
+
+    @Test fun callAbuMohammad() {
+        val r = p("اتصل بأبو محمد بعد المغرب")
+        assertEquals(com.myday.app.data.TaskAction.CALL, r.action)
+        assertEquals("أبو محمد", r.contactName)
+        assertEquals(Prayer.MAGHRIB, r.prayer)
+        assertEquals("اتصل بأبو محمد", r.title)
+    }
+
+    @Test fun talkToSomeoneIsNotAContact() {
+        assertNull(p("بكرا احكي مع حد بخصوص السيارة").action)
+        assertNull(p("اتصل بالبنك الساعة 10").action)
+    }
 }

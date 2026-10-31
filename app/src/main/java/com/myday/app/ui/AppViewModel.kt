@@ -10,6 +10,7 @@ import com.myday.app.container
 import com.myday.app.data.CategoryEntity
 import com.myday.app.data.CompletionEntity
 import com.myday.app.data.TaskEntity
+import com.myday.app.data.TaskAction
 import com.myday.app.prayer.PrayerConfig
 import com.myday.app.nlp.ParsedTask
 import com.myday.app.nlp.QuickDraft
@@ -29,6 +30,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** فعل مختار في الإضافة السريعة (بعد تحديد الشخص من جهات الاتصال). */
+data class ActionDraft(
+    val type: TaskAction,
+    val phone: String,
+    val name: String,
+    val message: String?,
+    val autoSend: Boolean = true,
+)
+
+fun TaskEntity.withAction(a: ActionDraft?): TaskEntity = if (a == null) this else copy(
+    actionType = a.type.name, actionPhone = a.phone, actionContactName = a.name,
+    actionMessage = a.message?.trim()?.ifBlank { null }, actionAutoSend = a.autoSend,
+)
 
 data class UiMessage(
     val text: String,
@@ -130,6 +145,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setTextScale(v: Float) = launchSafe { settingsRepo.setTextScale(v) }
     fun setCareContacts(v: List<CareContact>) = launchSafe { settingsRepo.setCareContacts(v) }
     fun setCareMessage(v: String) = launchSafe { settingsRepo.setCareMessage(v) }
+    fun removePhrase(v: String) = launchSafe { settingsRepo.removePhrase(v) }
     fun setCareSim(subId: Int, label: String) = launchSafe { settingsRepo.setCareSim(subId, label) }
 
     /** رسالة تجريبية لأول جهة اتصال للتأكد من عمل الإبلاغ. */
@@ -151,11 +167,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * حفظ مهمة من جملة مكتوبة أو منطوقة. يرجع false إذا احتاجت تحديد المدينة (مرتبطة بصلاة).
      */
-    fun quickSave(p: ParsedTask): Boolean {
+    fun quickSave(p: ParsedTask, action: ActionDraft? = null): Boolean {
         val due = QuickTaskBuilder.resolveDue(p, LocalDateTime.now(), PrayerStore.current()) ?: return false
-        val task = QuickTaskBuilder.build(p, due, settings.value, categories.value)
+        val task = QuickTaskBuilder.build(p, due, settings.value, categories.value).withAction(action)
         launchSafe {
             val id = repo.saveTask(task)
+            action?.message?.takeIf { it.isNotBlank() }?.let { settingsRepo.rememberPhrase(it) }
             _messages.emit(
                 UiMessage("أُضيفت «${task.title}» — ${com.myday.app.util.Fmt.dateTime(due, settings.value.use24h)}", "تراجع") {
                     launchSafe { repo.deleteTask(id) }
@@ -166,10 +183,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** تجهيز مسودة لفتحها في شاشة التعديل. */
-    fun prepareDraft(p: ParsedTask) {
+    fun prepareDraft(p: ParsedTask, action: ActionDraft? = null) {
         val due = QuickTaskBuilder.resolveDue(p, LocalDateTime.now(), PrayerStore.current())
             ?: LocalDateTime.now().plusHours(1).withMinute(0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        QuickDraft.put(QuickTaskBuilder.build(p, due, settings.value, categories.value))
+        QuickDraft.put(QuickTaskBuilder.build(p, due, settings.value, categories.value).withAction(action))
     }
 
     fun finishOnboarding() = launchSafe { settingsRepo.setOnboardingDone(true) }

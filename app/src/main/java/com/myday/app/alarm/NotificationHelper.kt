@@ -18,6 +18,8 @@ import androidx.core.content.ContextCompat
 import com.myday.app.MainActivity
 import com.myday.app.R
 import com.myday.app.data.TaskEntity
+import com.myday.app.data.TaskAction
+import com.myday.app.data.action
 import com.myday.app.util.Fmt
 
 object NotificationHelper {
@@ -30,6 +32,7 @@ object NotificationHelper {
     private const val REMINDER_BASE = 2_000_000
     private const val MISSED_BASE = 3_000_000
     private const val FALLBACK_BASE = 4_000_000
+    private const val ACTION_BASE = 5_000_000
 
     fun createChannels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -114,14 +117,25 @@ object NotificationHelper {
             .setSilent(true)
             .build()
 
-    fun buildRingingNotification(context: Context, task: TaskEntity): Notification {
+    fun buildRingingNotification(context: Context, task: TaskEntity, autoSendPending: Boolean = false): Notification {
         val fullScreen = PendingIntent.getActivity(
             context, (task.id * 10 + 5).toInt(), AlarmActivity.intent(context, task.id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val action = task.action
         val text = buildString {
             append("الموعد: ").append(timeText(context, task.dueAt))
             if (task.description.isNotBlank()) append(" — ").append(task.description)
+            if (action != null) {
+                append("\n")
+                when (action) {
+                    TaskAction.SMS -> append(if (autoSendPending) "ستُرسل خلال 30 ثانية إلى " else "رسالة إلى ")
+                    TaskAction.WHATSAPP -> append("واتساب إلى ")
+                    TaskAction.CALL -> append("اتصال بـ ")
+                }
+                append(task.actionContactName ?: task.actionPhone)
+                if (!task.actionMessage.isNullOrBlank() && action != TaskAction.CALL) append(": «").append(task.actionMessage).append("»")
+            }
         }
         return NotificationCompat.Builder(context, CHANNEL_ALARM)
             .setSmallIcon(R.drawable.ic_stat_alarm)
@@ -137,7 +151,20 @@ object NotificationHelper {
             .setContentIntent(fullScreen)
             .setFullScreenIntent(fullScreen, true)
             .apply {
-                if (task.isCare) {
+                if (action == TaskAction.SMS) {
+                    addAction(0, "أرسل الآن", actionPending(context, AlarmActionReceiver.ACTION_SEND_NOW, task.id))
+                    if (autoSendPending) addAction(0, "إلغاء الإرسال", actionPending(context, AlarmActionReceiver.ACTION_CANCEL_SEND, task.id))
+                    else addAction(0, "إيقاف", actionPending(context, AlarmActionReceiver.ACTION_STOP, task.id))
+                    addAction(0, "غفوة 5 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 5))
+                } else if (action == TaskAction.WHATSAPP || action == TaskAction.CALL) {
+                    val perform = PendingIntent.getActivity(
+                        context, (task.id * 10 + 2).toInt(), AlarmActivity.intent(context, task.id, perform = true),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    addAction(0, if (action == TaskAction.CALL) "اتصل الآن" else "افتح واتساب", perform)
+                    addAction(0, "إيقاف", actionPending(context, AlarmActionReceiver.ACTION_STOP, task.id))
+                    addAction(0, "غفوة 5 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 5))
+                } else if (task.isCare) {
                     // الرعاية: لا إيقاف دون تأكيد
                     addAction(0, "✓ تمّ", actionPending(context, AlarmActionReceiver.ACTION_COMPLETE, task.id))
                     addAction(0, "ذكّرني بعد 10 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 10))
@@ -205,6 +232,20 @@ object NotificationHelper {
             .addAction(0, "تمّت", actionPending(context, AlarmActionReceiver.ACTION_COMPLETE, task.id))
             .build()
         notifySafe(context, MISSED_BASE + task.id.toInt(), n)
+    }
+
+    fun showActionResult(context: Context, task: TaskEntity, text: String) {
+        if (!canPost(context)) return
+        val n = NotificationCompat.Builder(context, CHANNEL_REMINDER)
+            .setSmallIcon(R.drawable.ic_stat_alarm)
+            .setContentTitle(task.title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setSilent(true)
+            .setContentIntent(openTaskPending(context, task.id, (task.id * 10 + 3).toInt()))
+            .setAutoCancel(true)
+            .build()
+        notifySafe(context, ACTION_BASE + task.id.toInt(), n)
     }
 
     fun cancelForTask(context: Context, taskId: Long) {

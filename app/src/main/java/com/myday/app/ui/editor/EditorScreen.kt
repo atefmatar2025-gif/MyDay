@@ -86,6 +86,7 @@ import com.myday.app.ui.AppViewModel
 import com.myday.app.ui.components.CategoryIcons
 import com.myday.app.ui.components.DatePickerModal
 import com.myday.app.ui.components.TimePickerModal
+import com.myday.app.ui.components.ActionEditor
 import com.myday.app.ui.components.color
 import com.myday.app.ui.theme.PriorityColors
 import com.myday.app.ui.theme.isAppInDarkTheme
@@ -145,6 +146,8 @@ fun EditorScreen(
             SaveResult.NEED_TITLE -> appVm.message("اكتب عنوان المهمة أولاً")
             SaveResult.PAST_TIME -> showPastDialog = true
             SaveResult.NEED_LOCATION -> appVm.message("حدد مدينتك أولاً لحساب أوقات الصلاة")
+            SaveResult.NEED_CONTACT -> appVm.message("اختر الشخص الذي تُرسل له أو تتصل به")
+            SaveResult.NEED_MESSAGE -> appVm.message("اكتب نص الرسالة")
             SaveResult.SAVED -> Unit
         }
     }
@@ -308,6 +311,21 @@ fun EditorScreen(
                     }
                 }
             }
+
+            Section("مهمة تُنجز نفسها (اختياري)")
+            Text(
+                "في الموعد تُرسل رسالة أو تفتح واتساب أو الاتصال بمن تختار.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            ActionEditor(
+                type = s.actionType, onType = { t -> vm.update { it.copy(actionType = t) } },
+                contactName = s.actionContactName, phone = s.actionPhone,
+                onContact = { n, p -> vm.update { it.copy(actionContactName = n, actionPhone = p) } },
+                message = s.actionMessage, onMessage = { m -> vm.update { it.copy(actionMessage = m) } },
+                autoSend = s.actionAutoSend, onAutoSend = { a -> vm.update { it.copy(actionAutoSend = a) } },
+                phrases = settings.phrases,
+            )
 
             Section("تذكير قبل الموعد")
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
