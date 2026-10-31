@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Dayflow" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/cream_white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <style name="Theme.Dayflow.Alarm" parent="Theme.Dayflow">
+        <item name="android:windowBackground">@color/deep_navy</item>
+    </style>
+</resources>

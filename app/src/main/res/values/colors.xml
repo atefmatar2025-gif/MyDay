@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="deep_navy">#FF111D35</color>
+    <color name="royal_blue">#FF294C80</color>
+    <color name="warm_orange">#FFF39B42</color>
+    <color name="cream_white">#FFF7F5F0</color>
+    <color name="soft_gray">#FFE8ECF2</color>
+    <color name="success_green">#FF38A878</color>
+    <color name="ic_launcher_background">#FF111D35</color>
+    <color name="widget_bg">#F2111D35</color>
+    <color name="widget_text">#FFF7F5F0</color>
+    <color name="widget_muted">#B3F7F5F0</color>
+</resources>
