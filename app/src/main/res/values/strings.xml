@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">يومي</string>
+    <string name="channel_alarm_name">منبهات المهام</string>
+    <string name="channel_alarm_desc">رنين المنبه في موعد المهمة</string>
+    <string name="channel_reminder_name">تذكيرات مسبقة</string>
+    <string name="channel_reminder_desc">تذكير قبل موعد المهمة</string>
+</resources>

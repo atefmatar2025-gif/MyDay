@@ -1,0 +1,54 @@
+package com.myday.app.data
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+@Database(
+    entities = [TaskEntity::class, CategoryEntity::class, CompletionEntity::class],
+    version = 1,
+    exportSchema = true,
+)
+@TypeConverters(Converters::class)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun taskDao(): TaskDao
+    abstract fun categoryDao(): CategoryDao
+    abstract fun completionDao(): CompletionDao
+
+    companion object {
+        /**
+         * التصنيفات الافتراضية تُضاف مرة واحدة عند إنشاء قاعدة البيانات.
+         * (ليست بيانات تجريبية؛ هي تصنيفات جاهزة قابلة للتعديل والحذف.)
+         */
+        val DEFAULT_CATEGORIES = listOf(
+            Triple("العمل", 0xFF2563EBL, "work"),
+            Triple("الدراسة", 0xFF7C3AEDL, "study"),
+            Triple("العبادة", 0xFF059669L, "worship"),
+            Triple("الصحة", 0xFFDC2626L, "health"),
+            Triple("المواعيد الشخصية", 0xFFDB2777L, "personal"),
+            Triple("الأسرة", 0xFFEA580CL, "family"),
+            Triple("التسوق", 0xFFCA8A04L, "shopping"),
+            Triple("المهام المنزلية", 0xFF0891B2L, "home"),
+        )
+
+        fun build(context: Context): AppDatabase =
+            Room.databaseBuilder(context, AppDatabase::class.java, "myday.db")
+                // لا نستخدم fallbackToDestructiveMigration حتى لا تُفقد البيانات عند التحديث.
+                // أي تغيير مستقبلي في البنية يجب أن يرافقه Migration صريح.
+                .addCallback(object : Callback() {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        super.onCreate(db)
+                        DEFAULT_CATEGORIES.forEachIndexed { index, (name, color, icon) ->
+                            db.execSQL(
+                                "INSERT INTO categories (name, colorArgb, iconKey, isDefault, sortOrder) VALUES (?, ?, ?, 1, ?)",
+                                arrayOf<Any>(name, color, icon, index)
+                            )
+                        }
+                    }
+                })
+                .build()
+    }
+}
