@@ -87,6 +87,10 @@ data class TaskEntity(
     val actionMessage: String? = null,
     /** للرسائل النصية: إرسال تلقائي بعد عدّاد تنازلي ما لم يُلغَ */
     @ColumnInfo(defaultValue = "1") val actionAutoSend: Boolean = true,
+    /** إن وُجد: لا يتوقف المنبه إلا بمسح هذا الرمز (QR أو باركود منتج) */
+    val proofCode: String? = null,
+    /** وصف مكان الرمز، مثل «علبة الدواء» */
+    val proofLabel: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

@@ -82,6 +82,7 @@ class BackupManager(private val context: Context, private val repo: TaskReposito
         .put("actionType", actionType ?: JSONObject.NULL).put("actionPhone", actionPhone ?: JSONObject.NULL)
         .put("actionContactName", actionContactName ?: JSONObject.NULL).put("actionMessage", actionMessage ?: JSONObject.NULL)
         .put("actionAutoSend", actionAutoSend)
+        .put("proofCode", proofCode ?: JSONObject.NULL).put("proofLabel", proofLabel ?: JSONObject.NULL)
 
     private fun taskFrom(o: JSONObject) = TaskEntity(
         id = o.getLong("id"),
@@ -112,6 +113,8 @@ class BackupManager(private val context: Context, private val repo: TaskReposito
         actionContactName = o.optStringOrNull("actionContactName"),
         actionMessage = o.optStringOrNull("actionMessage"),
         actionAutoSend = o.optBoolean("actionAutoSend", true),
+        proofCode = o.optStringOrNull("proofCode"),
+        proofLabel = o.optStringOrNull("proofLabel"),
     )
 
     private fun CompletionEntity.toJson() = JSONObject()

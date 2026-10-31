@@ -312,6 +312,13 @@ fun EditorScreen(
                 }
             }
 
+            Section("منبه بإثبات (اختياري)")
+            ProofSection(
+                title = s.title, code = s.proofCode, label = s.proofLabel,
+                onCode = { c, l -> vm.update { it.copy(proofCode = c, proofLabel = l, alarmEnabled = if (c != null) true else it.alarmEnabled) } },
+                onLabel = { l -> vm.update { it.copy(proofLabel = l) } },
+            )
+
             Section("مهمة تُنجز نفسها (اختياري)")
             Text(
                 "في الموعد تُرسل رسالة أو تفتح واتساب أو الاتصال بمن تختار.",

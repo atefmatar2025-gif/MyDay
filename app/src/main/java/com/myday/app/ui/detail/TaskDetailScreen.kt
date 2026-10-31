@@ -75,6 +75,7 @@ import com.myday.app.data.TaskEntity
 import com.myday.app.data.TaskAction
 import com.myday.app.data.action
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.QrCode2
 import com.myday.app.data.CompletionEntity
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Brightness2
@@ -170,6 +171,9 @@ fun TaskDetailScreen(
                 "التصنيف", category?.name ?: "بلا تصنيف", category?.color()
             )
             InfoRow(Icons.Rounded.Repeat, "التكرار", task.repeatType.label)
+            task.proofCode?.let {
+                InfoRow(Icons.Rounded.QrCode2, "منبه بإثبات", "لا يتوقف إلا بمسح الرمز" + (task.proofLabel?.let { l -> " ($l)" } ?: ""))
+            }
             task.action?.let { a ->
                 val who = task.actionContactName ?: task.actionPhone.orEmpty()
                 val detail = when (a) {

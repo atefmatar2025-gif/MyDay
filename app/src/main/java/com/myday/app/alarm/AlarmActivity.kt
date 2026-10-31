@@ -62,6 +62,10 @@ import com.myday.app.data.TaskEntity
 import com.myday.app.data.TaskAction
 import com.myday.app.data.action
 import android.app.Activity
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.rounded.QrCodeScanner
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.withTimeoutOrNull
 import android.app.KeyguardManager
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.rounded.Call
@@ -249,7 +253,15 @@ private fun AlarmScreen(taskId: Long, perform: Boolean, onClose: () -> Unit) {
                     }
                 }
 
-                if (task?.isCare == true) {
+                val proofTask = task?.takeIf { it.proofCode != null }
+                if (proofTask != null) {
+                    ProofPanel(
+                        task = proofTask,
+                        onMatched = { act { repo.complete(taskId) } },
+                        onSnooze = { act { repo.snooze(taskId, 5) } },
+                        onEmergencyStop = { act { repo.stopRinging(taskId) } },
+                    )
+                } else if (task?.isCare == true) {
                     // وضع الرعاية: زر تأكيد كبير وواضح، ولا إيقاف دون تأكيد
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("مهمة رعاية — يُرجى التأكيد", style = MaterialTheme.typography.titleMedium, color = cs.error)
@@ -366,5 +378,62 @@ private fun ActionPanel(task: TaskEntity, onSendNow: (String) -> Unit, onOpenExt
                 }
             }
         }
+    }
+}
+
+/** منبه بإثبات: يتوقف فقط بمسح الرمز الصحيح، مع غفوة وإيقاف طارئ بالضغط المطوّل. */
+@Composable
+private fun ProofPanel(task: TaskEntity, onMatched: () -> Unit, onSnooze: () -> Unit, onEmergencyStop: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    var scanning by remember { mutableStateOf(false) }
+    var wrong by remember { mutableStateOf(false) }
+    var holding by remember { mutableStateOf(false) }
+    val expected = task.proofCode.orEmpty().trim()
+
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (scanning) {
+            com.myday.app.proof.CodeScanner(
+                modifier = Modifier.fillMaxWidth().height(260.dp),
+                hint = task.proofLabel?.let { "امسح الرمز الموجود في: $it" } ?: "امسح الرمز لإيقاف المنبه",
+            ) { text ->
+                if (text.trim() == expected) { onMatched(); true } else { wrong = true; false }
+            }
+            if (wrong) Text("هذا ليس الرمز المطلوب", color = cs.error, style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(top = 6.dp))
+        } else {
+            Text(
+                task.proofLabel?.let { "اذهب إلى «$it» وامسح الرمز" } ?: "لا يتوقف المنبه إلا بمسح الرمز",
+                style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = { scanning = true }, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+                Icon(androidx.compose.material.icons.Icons.Rounded.QrCodeScanner, null, Modifier.size(28.dp))
+                Spacer(Modifier.size(10.dp))
+                Text("امسح الرمز للإيقاف", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        FilledTonalButton(onClick = onSnooze, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Rounded.Snooze, null); Spacer(Modifier.size(8.dp)); Text("غفوة 5 دقائق")
+        }
+        Spacer(Modifier.height(6.dp))
+        // إيقاف طارئ: ضغط مطوّل 5 ثوانٍ (إذا تعطلت الكاميرا مثلاً)
+        Text(
+            if (holding) "استمر بالضغط…" else "إيقاف طارئ: اضغط مطوّلاً 5 ثوانٍ",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (holding) cs.error else cs.onSurfaceVariant,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (holding) cs.errorContainer else androidx.compose.ui.graphics.Color.Transparent)
+                .pointerInput(Unit) {
+                    detectTapGestures(onPress = {
+                        holding = true
+                        val released = withTimeoutOrNull(5_000) { tryAwaitRelease() }
+                        holding = false
+                        if (released == null) onEmergencyStop()
+                    })
+                }
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        )
     }
 }

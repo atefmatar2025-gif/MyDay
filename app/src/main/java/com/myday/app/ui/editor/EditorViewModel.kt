@@ -59,6 +59,8 @@ data class EditorState(
     val actionContactName: String = "",
     val actionMessage: String = "",
     val actionAutoSend: Boolean = true,
+    val proofCode: String? = null,
+    val proofLabel: String = "",
 ) {
     val offsetMin: Int get() = if (relation == 0) 0 else relation * offsetAbs
 
@@ -137,6 +139,8 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
                     actionContactName = source.actionContactName.orEmpty(),
                     actionMessage = source.actionMessage.orEmpty(),
                     actionAutoSend = source.actionAutoSend,
+                    proofCode = source.proofCode,
+                    proofLabel = source.proofLabel.orEmpty(),
                     prayerMode = anchored != null,
                     prayer = anchored ?: Prayer.ASR,
                     relation = source.anchorOffsetMin.sign,
@@ -184,11 +188,14 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
             actionContactName = s.actionContactName.trim().ifBlank { null },
             actionMessage = s.actionMessage.trim().ifBlank { null },
             actionAutoSend = s.actionAutoSend,
+            proofCode = s.proofCode,
+            proofLabel = s.proofLabel.trim().ifBlank { null },
+            alarmEnabled = s.alarmEnabled || s.isCare || s.proofCode != null,
             priority = s.priority,
             categoryId = s.categoryId,
             repeatType = s.repeatType,
             isFavorite = s.isFavorite,
-            alarmEnabled = s.alarmEnabled || s.isCare,
+
             reminderMinutesBefore = s.reminderMin,
             soundUri = s.soundUri,
             soundName = s.soundName,

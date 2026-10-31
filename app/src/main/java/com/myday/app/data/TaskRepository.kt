@@ -163,8 +163,9 @@ class TaskRepository(
         val task = taskDao.getById(id) ?: return
         if (task.isCompleted) return
         // مهام الرعاية تعيد الرنين دائماً (3 مرات على الأقل) قبل الإبلاغ
-        val maxRepeats = if (task.isCare) maxOf(task.maxRepeats, 3) else task.maxRepeats
-        if ((task.repeatIfNoResponse || task.isCare) && task.ringAttempt < maxRepeats) {
+        val insistent = task.isCare || task.proofCode != null
+        val maxRepeats = if (insistent) maxOf(task.maxRepeats, 3) else task.maxRepeats
+        if ((task.repeatIfNoResponse || insistent) && task.ringAttempt < maxRepeats) {
             val updated = task.copy(
                 snoozedUntil = System.currentTimeMillis() + task.repeatIntervalMin.coerceAtLeast(1) * 60_000L,
                 ringAttempt = task.ringAttempt + 1,

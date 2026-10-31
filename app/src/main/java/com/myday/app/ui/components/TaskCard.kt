@@ -51,6 +51,7 @@ import com.myday.app.data.TaskAction
 import com.myday.app.data.action
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.QrCode2
 import com.myday.app.ui.theme.PriorityColors
 import com.myday.app.util.Fmt
 import com.myday.app.util.TaskTime
@@ -148,6 +149,7 @@ fun TaskCard(
                             cs.primary
                         )
                     }
+                    if (task.proofCode != null) MetaChip(Icons.Rounded.QrCode2, "بإثبات", cs.tertiary)
                     if (task.isCare) MetaChip(Icons.Rounded.Favorite, "رعاية", cs.error)
                     TaskTime.anchorLabel(task)?.let { MetaChip(Icons.Rounded.Brightness2, it, cs.tertiary) }
                     if (task.isRecurring) MetaChip(Icons.Rounded.Repeat, task.repeatType.label, cs.tertiary)

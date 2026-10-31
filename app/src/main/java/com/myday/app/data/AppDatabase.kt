@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TaskEntity::class, CategoryEntity::class, CompletionEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -61,11 +61,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** الإصدار 5: منبه لا يتوقف إلا بمسح رمز. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN proofCode TEXT")
+                db.execSQL("ALTER TABLE tasks ADD COLUMN proofLabel TEXT")
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "myday.db")
                 // لا نستخدم fallbackToDestructiveMigration حتى لا تُفقد البيانات عند التحديث.
                 // أي تغيير مستقبلي في البنية يجب أن يرافقه Migration صريح.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)

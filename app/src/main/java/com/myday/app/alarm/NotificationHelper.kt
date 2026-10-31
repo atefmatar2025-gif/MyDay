@@ -151,7 +151,11 @@ object NotificationHelper {
             .setContentIntent(fullScreen)
             .setFullScreenIntent(fullScreen, true)
             .apply {
-                if (action == TaskAction.SMS) {
+                if (task.proofCode != null) {
+                    // لا يتوقف إلا بمسح الرمز من شاشة المنبه
+                    addAction(0, "امسح الرمز للإيقاف", fullScreen)
+                    addAction(0, "غفوة 5 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 5))
+                } else if (action == TaskAction.SMS) {
                     addAction(0, "أرسل الآن", actionPending(context, AlarmActionReceiver.ACTION_SEND_NOW, task.id))
                     if (autoSendPending) addAction(0, "إلغاء الإرسال", actionPending(context, AlarmActionReceiver.ACTION_CANCEL_SEND, task.id))
                     else addAction(0, "إيقاف", actionPending(context, AlarmActionReceiver.ACTION_STOP, task.id))
