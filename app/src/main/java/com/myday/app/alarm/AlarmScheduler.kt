@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.util.Log
 import com.myday.app.MainActivity
+import com.myday.app.widget.WidgetUpdater
 import com.myday.app.data.TaskEntity
 import com.myday.app.util.TaskTime
 
@@ -39,6 +40,7 @@ class AlarmScheduler(private val context: Context) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
     fun schedule(task: TaskEntity, now: Long = System.currentTimeMillis()) {
+        WidgetUpdater.request(context)
         val alarmAt = AlarmTimes.nextAlarm(task, now)
         if (alarmAt != null) setMain(task.id, alarmAt) else cancelMain(task.id)
 
@@ -47,6 +49,7 @@ class AlarmScheduler(private val context: Context) {
     }
 
     fun cancel(taskId: Long) {
+        WidgetUpdater.request(context)
         cancelMain(taskId)
         cancelReminder(taskId)
     }

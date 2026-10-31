@@ -14,12 +14,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.myday.app.settings.AppSettings
 import com.myday.app.ui.navigation.MyDayRoot
 import com.myday.app.ui.theme.MyDayTheme
+import com.myday.app.widget.WidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
 
     /** مهمة مطلوب فتحها (من إشعار أو منبه). */
     private val openTaskRequest = MutableStateFlow<Long?>(null)
+    /** طلب فتح الإضافة السريعة بالصوت (من الودجت) */
+    private val quickAddRequest = MutableStateFlow(false)
     @Volatile private var settingsLoaded = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +39,7 @@ class MainActivity : ComponentActivity() {
             if (s != null) {
                 SideEffect { settingsLoaded = true }
                 MyDayTheme(themeMode = s.themeMode, dynamicColor = s.dynamicColor, textScale = s.textScale) {
-                    MyDayRoot(settings = s, openTaskRequest = openTaskRequest)
+                    MyDayRoot(settings = s, openTaskRequest = openTaskRequest, quickAddRequest = quickAddRequest)
                 }
             }
         }
@@ -50,10 +53,23 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         val id = intent?.getLongExtra(EXTRA_OPEN_TASK, -1L) ?: -1L
         if (id > 0) openTaskRequest.value = id
+        if (intent?.getBooleanExtra(EXTRA_QUICK_ADD, false) == true) quickAddRequest.value = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        WidgetUpdater.request(this)
     }
 
     companion object {
         const val EXTRA_OPEN_TASK = "open_task_id"
+        const val EXTRA_QUICK_ADD = "quick_add"
+
+        fun quickAddIntent(context: Context): Intent =
+            Intent(context, MainActivity::class.java)
+                .setData(Uri.parse("myday://quickadd"))
+                .putExtra(EXTRA_QUICK_ADD, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
         fun openTaskIntent(context: Context, taskId: Long): Intent =
             Intent(context, MainActivity::class.java)

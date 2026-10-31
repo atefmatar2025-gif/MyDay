@@ -5,4 +5,6 @@
     <string name="channel_alarm_desc">رنين المنبه في موعد المهمة</string>
     <string name="channel_reminder_name">تذكيرات مسبقة</string>
     <string name="channel_reminder_desc">تذكير قبل موعد المهمة</string>
+    <string name="widget_name">مهام اليوم</string>
+    <string name="widget_desc">مهام اليوم بنظرة سريعة: التالي، نسبة الإنجاز، وإتمام بلمسة</string>
 </resources>

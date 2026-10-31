@@ -49,6 +49,8 @@ import com.myday.app.ui.editor.EditorScreen
 import com.myday.app.ui.home.HomeScreen
 import com.myday.app.ui.permissions.PermissionsScreen
 import com.myday.app.ui.prayer.PrayerSettingsScreen
+import com.myday.app.ui.quickadd.QuickAddSheet
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.myday.app.ui.settings.SettingsScreen
 import com.myday.app.ui.stats.StatsScreen
 import com.myday.app.ui.tasks.TasksScreen
@@ -87,7 +89,7 @@ private val topLevel = listOf(
 )
 
 @Composable
-fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>) {
+fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>, quickAddRequest: MutableStateFlow<Boolean>) {
     val vm: AppViewModel = viewModel()
     val nav = rememberNavController()
     val snackbar = remember { SnackbarHostState() }
@@ -115,6 +117,17 @@ fun MyDayRoot(settings: AppSettings, openTaskRequest: MutableStateFlow<Long?>) {
                 openTaskRequest.value = null
             }
         }
+    }
+
+    // الإضافة السريعة بالصوت من الودجت
+    val quickAdd by quickAddRequest.collectAsStateWithLifecycle()
+    if (quickAdd && settings.onboardingDone) {
+        QuickAddSheet(
+            vm = vm, startWithVoice = true,
+            onDismiss = { quickAddRequest.value = false },
+            onOpenDraft = { nav.navigate(Routes.DRAFT) },
+            onOpenPrayerSettings = { nav.navigate(Routes.PRAYER) }
+        )
     }
 
     val backStack by nav.currentBackStackEntryAsState()
