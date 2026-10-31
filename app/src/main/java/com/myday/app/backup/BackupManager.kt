@@ -78,6 +78,7 @@ class BackupManager(private val context: Context, private val repo: TaskReposito
         .put("repeatIntervalMin", repeatIntervalMin).put("maxRepeats", maxRepeats)
         .put("createdAt", createdAt).put("updatedAt", updatedAt)
         .put("anchorPrayer", anchorPrayer ?: JSONObject.NULL).put("anchorOffsetMin", anchorOffsetMin)
+        .put("isCare", isCare)
 
     private fun taskFrom(o: JSONObject) = TaskEntity(
         id = o.getLong("id"),
@@ -102,6 +103,7 @@ class BackupManager(private val context: Context, private val repo: TaskReposito
         updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
         anchorPrayer = o.optStringOrNull("anchorPrayer"),
         anchorOffsetMin = o.optInt("anchorOffsetMin", 0),
+        isCare = o.optBoolean("isCare", false),
     )
 
     private fun CompletionEntity.toJson() = JSONObject()

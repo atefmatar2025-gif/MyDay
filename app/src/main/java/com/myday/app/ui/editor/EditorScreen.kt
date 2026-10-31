@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -232,6 +233,17 @@ fun EditorScreen(
             }
 
             SwitchRow(Icons.Rounded.Star, "مهمة مهمة (مفضلة)", "تظهر في قائمة المهام المهمة", s.isFavorite) { v -> vm.update { it.copy(isFavorite = v) } }
+            SwitchRow(
+                Icons.Rounded.Favorite, "مهمة رعاية (دواء أو أمر حرج)",
+                "تأكيد إلزامي بزر «تمّ»، وإبلاغ العائلة برسالة إن لم تُؤكَّد", s.isCare
+            ) { v -> vm.update { it.copy(isCare = v, alarmEnabled = if (v) true else it.alarmEnabled, repeatIfNoResponse = if (v) true else it.repeatIfNoResponse) } }
+            if (s.isCare && settings.careContacts.isEmpty()) {
+                Text(
+                    "لم تُضف جهة اتصال للعائلة بعد — أضفها من الإعدادات ◂ الرعاية والعائلة ليتم إبلاغها.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
 
             Section("المنبه")
             Column(

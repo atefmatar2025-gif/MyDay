@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
             val s = settings
             if (s != null) {
                 SideEffect { settingsLoaded = true }
-                MyDayTheme(themeMode = s.themeMode, dynamicColor = s.dynamicColor) {
+                MyDayTheme(themeMode = s.themeMode, dynamicColor = s.dynamicColor, textScale = s.textScale) {
                     MyDayRoot(settings = s, openTaskRequest = openTaskRequest)
                 }
             }

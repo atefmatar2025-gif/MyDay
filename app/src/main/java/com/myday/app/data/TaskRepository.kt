@@ -3,7 +3,9 @@ package com.myday.app.data
 import android.content.Context
 import androidx.room.withTransaction
 import com.myday.app.alarm.AlarmScheduler
+import com.myday.app.alarm.CareNotifier
 import com.myday.app.alarm.NotificationHelper
+import com.myday.app.settings.SettingsRepository
 import com.myday.app.util.Recurrence
 import com.myday.app.util.TaskTime
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +18,7 @@ class TaskRepository(
     private val context: Context,
     private val db: AppDatabase,
     private val scheduler: AlarmScheduler,
+    private val settings: SettingsRepository,
 ) {
     private val taskDao = db.taskDao()
     private val categoryDao = db.categoryDao()
@@ -159,7 +162,9 @@ class TaskRepository(
     suspend fun onRingTimeout(id: Long) {
         val task = taskDao.getById(id) ?: return
         if (task.isCompleted) return
-        if (task.repeatIfNoResponse && task.ringAttempt < task.maxRepeats) {
+        // مهام الرعاية تعيد الرنين دائماً (3 مرات على الأقل) قبل الإبلاغ
+        val maxRepeats = if (task.isCare) maxOf(task.maxRepeats, 3) else task.maxRepeats
+        if ((task.repeatIfNoResponse || task.isCare) && task.ringAttempt < maxRepeats) {
             val updated = task.copy(
                 snoozedUntil = System.currentTimeMillis() + task.repeatIntervalMin.coerceAtLeast(1) * 60_000L,
                 ringAttempt = task.ringAttempt + 1,
@@ -170,7 +175,9 @@ class TaskRepository(
             val updated = task.copy(snoozedUntil = null, ringAttempt = 0)
             taskDao.update(updated)
             scheduler.schedule(updated)
-            NotificationHelper.showMissed(context, task)
+            // وضع الرعاية: إبلاغ العائلة لأن المهمة لم تُؤكَّد بعد كل المحاولات
+            val informed = if (task.isCare) CareNotifier.escalate(context, task, settings.current()) else emptyList()
+            NotificationHelper.showMissed(context, task, informed.map { it.name })
         }
     }
 

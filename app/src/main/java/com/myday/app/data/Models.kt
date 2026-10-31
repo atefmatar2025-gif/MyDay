@@ -78,6 +78,8 @@ data class TaskEntity(
     val anchorPrayer: String? = null,
     /** الإزاحة بالدقائق عن الصلاة: سالب = قبل، موجب = بعد */
     @ColumnInfo(defaultValue = "0") val anchorOffsetMin: Int = 0,
+    /** مهمة رعاية (دواء/أمر حرج): تأكيد إلزامي وإبلاغ العائلة عند عدم الاستجابة */
+    @ColumnInfo(defaultValue = "0") val isCare: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

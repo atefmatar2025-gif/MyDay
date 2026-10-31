@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -32,7 +33,17 @@ data class AppSettings(
     val maxRepeats: Int = 3,
     val use24h: Boolean = false,
     val onboardingDone: Boolean = false,
+    /** حجم الخط: 1.0 عادي، 1.15 كبير، 1.3 كبير جداً */
+    val textScale: Float = 1f,
+    val careContacts: List<CareContact> = emptyList(),
+    val careMessage: String = DEFAULT_CARE_MESSAGE,
 )
+
+data class CareContact(val name: String, val phone: String)
+
+const val DEFAULT_CARE_MESSAGE =
+    "تنبيه من تطبيق يومي: لم يؤكد {الاسم} «{المهمة}» المقررة الساعة {الوقت}. يُرجى الاطمئنان عليه."
+
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -53,7 +64,19 @@ class SettingsRepository(private val context: Context) {
         val MAX_REPEATS = intPreferencesKey("max_repeats")
         val USE_24H = booleanPreferencesKey("use_24h")
         val ONBOARDING = booleanPreferencesKey("onboarding_done")
+        val TEXT_SCALE = floatPreferencesKey("text_scale")
+        val CARE_CONTACTS = stringPreferencesKey("care_contacts")
+        val CARE_MESSAGE = stringPreferencesKey("care_message")
     }
+
+    private fun encodeContacts(list: List<CareContact>) =
+        list.joinToString("\n") { "${it.name.replace("\t", " ").replace("\n", " ")}\t${it.phone.trim()}" }
+
+    private fun decodeContacts(s: String?): List<CareContact> =
+        s.orEmpty().split('\n').mapNotNull { line ->
+            val parts = line.split('\t')
+            if (parts.size == 2 && parts[1].isNotBlank()) CareContact(parts[0], parts[1]) else null
+        }
 
     val settings: Flow<AppSettings> = context.dataStore.data
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
@@ -74,6 +97,9 @@ class SettingsRepository(private val context: Context) {
                 maxRepeats = p[Keys.MAX_REPEATS] ?: d.maxRepeats,
                 use24h = p[Keys.USE_24H] ?: d.use24h,
                 onboardingDone = p[Keys.ONBOARDING] ?: d.onboardingDone,
+                textScale = p[Keys.TEXT_SCALE] ?: d.textScale,
+                careContacts = decodeContacts(p[Keys.CARE_CONTACTS]),
+                careMessage = p[Keys.CARE_MESSAGE]?.takeIf { it.isNotBlank() } ?: d.careMessage,
             )
         }
 
@@ -94,5 +120,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setRepeatInterval(v: Int) = context.dataStore.edit { it[Keys.REPEAT_INTERVAL] = v.coerceIn(1, 60) }
     suspend fun setMaxRepeats(v: Int) = context.dataStore.edit { it[Keys.MAX_REPEATS] = v.coerceIn(0, 10) }
     suspend fun setUse24h(v: Boolean) = context.dataStore.edit { it[Keys.USE_24H] = v }
+    suspend fun setTextScale(v: Float) = context.dataStore.edit { it[Keys.TEXT_SCALE] = v.coerceIn(0.9f, 1.5f) }
+    suspend fun setCareContacts(v: List<CareContact>) = context.dataStore.edit { it[Keys.CARE_CONTACTS] = encodeContacts(v.take(3)) }
+    suspend fun setCareMessage(v: String) = context.dataStore.edit { it[Keys.CARE_MESSAGE] = v.trim() }
     suspend fun setOnboardingDone(v: Boolean) = context.dataStore.edit { it[Keys.ONBOARDING] = v }
 }

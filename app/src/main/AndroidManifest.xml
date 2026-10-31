@@ -17,6 +17,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- اختياري: يُطلب فقط عند الضغط على «استخدام موقعي» لحساب أوقات الصلاة -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- اختياري: وضع الرعاية — رسالة SMS تلقائية للعائلة عند عدم تأكيد مهمة رعاية -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
         android:name=".MyDayApp"

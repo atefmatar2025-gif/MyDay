@@ -17,6 +17,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -136,6 +138,7 @@ fun isAppInDarkTheme(mode: ThemeMode): Boolean = when (mode) {
 fun MyDayTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
+    textScale: Float = 1f,
     content: @Composable () -> Unit,
 ) {
     val dark = isAppInDarkTheme(themeMode)
@@ -157,7 +160,12 @@ fun MyDayTheme(
     }
     MaterialTheme(colorScheme = colors, typography = AppTypography, shapes = AppShapes) {
         // واجهة عربية بالكامل من اليمين لليسار بغض النظر عن لغة الجهاز
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        // تكبير الخط اختيارياً (مفيد لكبار السن) فوق إعداد النظام
+        val density = LocalDensity.current
+        CompositionLocalProvider(
+            LocalLayoutDirection provides LayoutDirection.Rtl,
+            LocalDensity provides Density(density.density, density.fontScale * textScale),
+        ) {
             content()
         }
     }

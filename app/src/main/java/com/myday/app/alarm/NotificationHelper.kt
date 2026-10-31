@@ -136,9 +136,17 @@ object NotificationHelper {
             .setSilent(true)
             .setContentIntent(fullScreen)
             .setFullScreenIntent(fullScreen, true)
-            .addAction(0, "إيقاف", actionPending(context, AlarmActionReceiver.ACTION_STOP, task.id))
-            .addAction(0, "غفوة 5 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 5))
-            .addAction(0, "تمّت", actionPending(context, AlarmActionReceiver.ACTION_COMPLETE, task.id))
+            .apply {
+                if (task.isCare) {
+                    // الرعاية: لا إيقاف دون تأكيد
+                    addAction(0, "✓ تمّ", actionPending(context, AlarmActionReceiver.ACTION_COMPLETE, task.id))
+                    addAction(0, "ذكّرني بعد 10 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 10))
+                } else {
+                    addAction(0, "إيقاف", actionPending(context, AlarmActionReceiver.ACTION_STOP, task.id))
+                    addAction(0, "غفوة 5 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 5))
+                    addAction(0, "تمّت", actionPending(context, AlarmActionReceiver.ACTION_COMPLETE, task.id))
+                }
+            }
             .build()
     }
 
@@ -182,12 +190,15 @@ object NotificationHelper {
         notifySafe(context, REMINDER_BASE + task.id.toInt(), n)
     }
 
-    fun showMissed(context: Context, task: TaskEntity) {
+    fun showMissed(context: Context, task: TaskEntity, informed: List<String> = emptyList()) {
         if (!canPost(context)) return
+        val text = if (informed.isNotEmpty()) "لم تُؤكَّد في موعدها ${timeText(context, task.dueAt)}. أُبلغ: ${informed.joinToString("، ")}"
+        else "كان موعدها ${timeText(context, task.dueAt)}. اضغط للتفاصيل."
         val n = NotificationCompat.Builder(context, CHANNEL_REMINDER)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle("فاتك منبه: ${task.title}")
-            .setContentText("كان موعدها ${timeText(context, task.dueAt)}. اضغط للتفاصيل.")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(openTaskPending(context, task.id, (task.id * 10 + 4).toInt()))
             .setAutoCancel(true)

@@ -140,6 +140,10 @@ fun SettingsScreen(
                     pc?.let { "${it.cityName} • ${it.method.label}" } ?: "لم تُحدد بعد — مطلوبة للمهام المرتبطة بالصلاة", onOpenPrayer)
             }
 
+            Group("الرعاية والعائلة") {
+                CareSection(vm, settings)
+            }
+
             Group("المنبه الافتراضي للمهام الجديدة") {
                 ClickItem(Icons.Rounded.MusicNote, "النغمة الافتراضية", settings.defaultSoundName) {
                     soundLauncher.launch(SoundUtils.ringtonePickerIntent(settings.defaultSoundUri))

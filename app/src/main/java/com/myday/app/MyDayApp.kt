@@ -19,7 +19,7 @@ class AppContainer(context: Context) {
     val database: AppDatabase = AppDatabase.build(context)
     val settings = SettingsRepository(context)
     val scheduler = AlarmScheduler(context)
-    val repository = TaskRepository(context, database, scheduler)
+    val repository = TaskRepository(context, database, scheduler, settings)
     val backup = BackupManager(context, repository)
     /** نطاق عمليات قصيرة يجب ألا تُلغى بإغلاق شاشة. */
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

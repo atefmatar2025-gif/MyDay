@@ -90,7 +90,7 @@ class AlarmActivity : ComponentActivity() {
             val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null)
             val s = settings
             if (s != null) {
-                MyDayTheme(themeMode = s.themeMode, dynamicColor = s.dynamicColor) {
+                MyDayTheme(themeMode = s.themeMode, dynamicColor = s.dynamicColor, textScale = s.textScale) {
                     AlarmScreen(taskId = taskId, onClose = { finish() })
                 }
             }
@@ -196,7 +196,31 @@ private fun AlarmScreen(taskId: Long, onClose: () -> Unit) {
                     }
                 }
 
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (task?.isCare == true) {
+                    // وضع الرعاية: زر تأكيد كبير وواضح، ولا إيقاف دون تأكيد
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("مهمة رعاية — يُرجى التأكيد", style = MaterialTheme.typography.titleMedium, color = cs.error)
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = { act { repo.complete(taskId) } },
+                            modifier = Modifier.fillMaxWidth().height(96.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = cs.primary, contentColor = cs.onPrimary)
+                        ) {
+                            Icon(Icons.Rounded.Check, null, Modifier.size(36.dp))
+                            Spacer(Modifier.size(10.dp))
+                            Text("تمّ", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(14.dp))
+                        FilledTonalButton(
+                            onClick = { act { repo.snooze(taskId, 10) } },
+                            modifier = Modifier.fillMaxWidth().height(60.dp)
+                        ) {
+                            Icon(Icons.Rounded.Snooze, null)
+                            Spacer(Modifier.size(8.dp))
+                            Text("ذكّرني بعد 10 دقائق", fontSize = 18.sp)
+                        }
+                    }
+                } else Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("غفوة", style = MaterialTheme.typography.labelLarge, color = cs.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

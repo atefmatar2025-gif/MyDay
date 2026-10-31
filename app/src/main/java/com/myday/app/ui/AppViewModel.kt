@@ -13,6 +13,8 @@ import com.myday.app.data.TaskEntity
 import com.myday.app.prayer.PrayerConfig
 import com.myday.app.prayer.PrayerStore
 import com.myday.app.settings.AppSettings
+import com.myday.app.settings.CareContact
+import com.myday.app.alarm.CareNotifier
 import com.myday.app.settings.ThemeMode
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.delay
@@ -121,6 +123,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setRepeatInterval(v: Int) = launchSafe { settingsRepo.setRepeatInterval(v) }
     fun setMaxRepeats(v: Int) = launchSafe { settingsRepo.setMaxRepeats(v) }
     fun setUse24h(v: Boolean) = launchSafe { settingsRepo.setUse24h(v) }
+    fun setTextScale(v: Float) = launchSafe { settingsRepo.setTextScale(v) }
+    fun setCareContacts(v: List<CareContact>) = launchSafe { settingsRepo.setCareContacts(v) }
+    fun setCareMessage(v: String) = launchSafe { settingsRepo.setCareMessage(v) }
+
+    /** رسالة تجريبية لأول جهة اتصال للتأكد من عمل الإبلاغ. */
+    fun sendCareTest() = launchSafe {
+        val s = settings.value
+        val c = s.careContacts.firstOrNull() ?: run { _messages.emit(UiMessage("أضف جهة اتصال أولاً")); return@launchSafe }
+        val text = "رسالة تجريبية من تطبيق يومي: أنت مسجَّل لتلقي تنبيهات الرعاية الخاصة بـ ${s.userName.ifBlank { "صاحب الهاتف" }}."
+        val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { CareNotifier.send(getApplication<Application>(), c.phone, text) }
+        _messages.emit(UiMessage(if (ok) "أُرسلت رسالة تجريبية إلى ${c.name}" else "تعذر الإرسال — تحقق من صلاحية الرسائل والشريحة"))
+    }
+
     fun finishOnboarding() = launchSafe { settingsRepo.setOnboardingDone(true) }
 
     fun rescheduleAll() = launchSafe { repo.rescheduleAll() }

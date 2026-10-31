@@ -51,6 +51,7 @@ data class EditorState(
     /** -1 قبل، 0 عند، 1 بعد */
     val relation: Int = 1,
     val offsetAbs: Int = 30,
+    val isCare: Boolean = false,
 ) {
     val offsetMin: Int get() = if (relation == 0) 0 else relation * offsetAbs
 
@@ -120,6 +121,7 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
                     repeatIfNoResponse = source.repeatIfNoResponse,
                     repeatIntervalMin = source.repeatIntervalMin,
                     maxRepeats = source.maxRepeats,
+                    isCare = source.isCare,
                     prayerMode = anchored != null,
                     prayer = anchored ?: Prayer.ASR,
                     relation = source.anchorOffsetMin.sign,
@@ -159,16 +161,17 @@ class EditorViewModel(app: Application, handle: SavedStateHandle) : AndroidViewM
             dueAt = due,
             anchorPrayer = if (s.prayerMode) s.prayer.name else null,
             anchorOffsetMin = if (s.prayerMode) s.offsetMin else 0,
+            isCare = s.isCare,
             priority = s.priority,
             categoryId = s.categoryId,
             repeatType = s.repeatType,
             isFavorite = s.isFavorite,
-            alarmEnabled = s.alarmEnabled,
+            alarmEnabled = s.alarmEnabled || s.isCare,
             reminderMinutesBefore = s.reminderMin,
             soundUri = s.soundUri,
             soundName = s.soundName,
             soundDurationSec = s.soundDurationSec,
-            repeatIfNoResponse = s.repeatIfNoResponse,
+            repeatIfNoResponse = s.repeatIfNoResponse || s.isCare,
             repeatIntervalMin = s.repeatIntervalMin,
             maxRepeats = s.maxRepeats,
             // إذا نُقلت مهمة منجزة غير متكررة إلى موعد قادم، تعود نشطة

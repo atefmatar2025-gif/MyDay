@@ -71,6 +71,9 @@ import com.myday.app.ui.theme.PriorityColors
 import com.myday.app.ui.theme.isAppInDarkTheme
 import com.myday.app.util.Fmt
 import com.myday.app.util.TaskTime
+import com.myday.app.data.TaskEntity
+import com.myday.app.data.CompletionEntity
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Brightness2
 import com.myday.app.alarm.AlarmTimes
 import androidx.compose.ui.platform.LocalContext
@@ -90,6 +93,7 @@ fun TaskDetailScreen(
     var loadedOnce by remember { mutableStateOf(false) }
     val categories by vm.categories.collectAsStateWithLifecycle()
     val now by vm.now.collectAsStateWithLifecycle()
+    val completions by vm.completions.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
     var showPostpone by remember { mutableStateOf(false) }
     val dark = isAppInDarkTheme(settings.themeMode)
@@ -180,6 +184,11 @@ fun TaskDetailScreen(
             )
             task.completedAt?.let { InfoRow(Icons.Rounded.CheckCircle, "أُنجزت في", Fmt.dateTime(it, settings.use24h)) }
 
+            if (task.isCare) {
+                InfoRow(Icons.Rounded.Favorite, "مهمة رعاية", if (settings.careContacts.isEmpty()) "لا توجد جهة اتصال للإبلاغ"
+                    else "يُبلَّغ عند عدم التأكيد: ${settings.careContacts.joinToString("، ") { it.name }}", cs.error)
+                if (task.isRecurring) AdherenceRow(task, completions)
+            }
             Spacer(Modifier.height(20.dp))
             if (task.isCompleted) {
                 OutlinedButton(onClick = { vm.uncomplete(task) }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
@@ -221,6 +230,44 @@ fun TaskDetailScreen(
     }
     if (showPostpone && task != null) {
         PostponeSheet(task, settings.use24h, onDismiss = { showPostpone = false }) { at, label -> vm.postpone(task, at, label) }
+    }
+}
+
+/** الالتزام خلال آخر 7 أيام (لمهام الرعاية المتكررة مثل الأدوية). */
+@Composable
+private fun AdherenceRow(task: TaskEntity, completions: List<CompletionEntity>) {
+    val cs = MaterialTheme.colorScheme
+    val today = java.time.LocalDate.now()
+    val created = Fmt.toDate(task.createdAt)
+    val doneDays = remember(completions, task.id) {
+        completions.filter { it.taskId == task.id }.map { Fmt.toDate(it.occurrenceDueAt) }.toSet()
+    }
+    val days = (6 downTo 0).map { today.minusDays(it.toLong()) }.filter { !it.isBefore(created) }
+    if (days.isEmpty()) return
+    val done = days.count { it in doneDays }
+    Column(
+        Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(18.dp))
+            .background(cs.surfaceContainerLow).padding(14.dp)
+    ) {
+        Text("الالتزام آخر ${days.size} أيام: $done من ${days.size}", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            days.forEach { d ->
+                val ok = d in doneDays
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier.size(30.dp).clip(RoundedCornerShape(15.dp))
+                            .background(if (ok) cs.primary else if (d == today) cs.surfaceContainerHigh else cs.errorContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(if (ok) "✓" else if (d == today) "·" else "✗",
+                            color = if (ok) cs.onPrimary else cs.onErrorContainer, style = MaterialTheme.typography.labelLarge)
+                    }
+                    Text(Fmt.weekDaysShort[((d.dayOfWeek.value - Fmt.weekStart.value) + 7) % 7],
+                        style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+                }
+            }
+        }
     }
 }
 
