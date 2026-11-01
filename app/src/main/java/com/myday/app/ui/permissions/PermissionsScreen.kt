@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -153,6 +154,18 @@ fun PermissionsScreen(
                     onGrant = { SystemSettings.openFullScreenSettings(context) }
                 )
             }
+            if (SystemSettings.hasOemRestrictions) {
+                ManualRow(
+                    title = if (SystemSettings.isXiaomi) "العرض على شاشة القفل (شاومي)" else "العرض فوق التطبيقات وشاشة القفل",
+                    body = if (SystemSettings.isXiaomi)
+                        "افتح «أذونات أخرى» وفعّل: «العرض على شاشة القفل» و«عرض النوافذ المنبثقة أثناء العمل في الخلفية» و«التشغيل التلقائي». بدونها قد يرن المنبه دون أن تظهر شاشته."
+                    else "في إعدادات التطبيق فعّل العرض فوق التطبيقات/على شاشة القفل والتشغيل التلقائي إن وُجدت.",
+                    onOpen = {
+                        if (SystemSettings.isXiaomi) SystemSettings.openLockScreenPermissions(context)
+                        else SystemSettings.openAppDetails(context)
+                    }
+                )
+            }
             PermissionRow(
                 icon = Icons.Rounded.BatteryChargingFull,
                 title = "استثناء من توفير البطارية (اختياري)",
@@ -213,5 +226,28 @@ private fun PermissionRow(
         } else {
             FilledTonalButton(onClick = onGrant) { Text("منح") }
         }
+    }
+}
+
+/** إعداد لا يمكن التحقق منه برمجياً (قيود الشركات المصنّعة) — زر يفتح الصفحة الصحيحة. */
+@Composable
+private fun ManualRow(title: String, body: String, onOpen: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(20.dp))
+            .background(cs.secondaryContainer).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(cs.secondary),
+            contentAlignment = Alignment.Center
+        ) { Icon(Icons.Rounded.Lock, null, tint = cs.onSecondary) }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = cs.onSecondaryContainer)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = cs.onSecondaryContainer)
+        }
+        Spacer(Modifier.width(8.dp))
+        FilledTonalButton(onClick = onOpen) { Text("فتح") }
     }
 }

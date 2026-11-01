@@ -16,6 +16,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
+/** طريقة إيقاف المنبه العادي (الغفوة متاحة دائماً). */
+enum class StopMethod(val label: String, val hint: String) {
+    BUTTON("زر", "ضغطة واحدة على «إيقاف»"),
+    SLIDE("سحب", "اسحب المؤشر حتى النهاية"),
+    HOLD("ضغط مطوّل", "اضغط مطوّلاً 3 ثوانٍ"),
+    MATH("مسألة حسابية", "حلّ مسألة بسيطة — يوقظ الذهن"),
+    SHAKE("هزّ الهاتف", "هزّ الهاتف 15 مرة");
+}
+
 enum class ThemeMode(val label: String) { SYSTEM("حسب النظام"), LIGHT("نهاري"), DARK("ليلي") }
 
 data class AppSettings(
@@ -42,6 +51,11 @@ data class AppSettings(
     val careSimLabel: String = "",
     /** دفتر العبارات: رسائل جاهزة تُستخدم بلمسة */
     val phrases: List<String> = DEFAULT_PHRASES,
+    val stopMethod: StopMethod = StopMethod.BUTTON,
+    /** 1 سهل، 2 متوسط، 3 صعب */
+    val mathLevel: Int = 1,
+    /** عرض شاشة المنبه فوق شاشة القفل وتشغيل الشاشة */
+    val showOnLockScreen: Boolean = true,
 )
 
 val DEFAULT_PHRASES = listOf(
@@ -80,6 +94,9 @@ class SettingsRepository(private val context: Context) {
         val CARE_SIM = intPreferencesKey("care_sim_sub_id")
         val CARE_SIM_LABEL = stringPreferencesKey("care_sim_label")
         val PHRASES = stringPreferencesKey("phrases")
+        val STOP_METHOD = stringPreferencesKey("stop_method")
+        val MATH_LEVEL = intPreferencesKey("math_level")
+        val SHOW_ON_LOCK = booleanPreferencesKey("show_on_lock")
     }
 
     private fun encodeContacts(list: List<CareContact>) =
@@ -115,6 +132,9 @@ class SettingsRepository(private val context: Context) {
                 careMessage = p[Keys.CARE_MESSAGE]?.takeIf { it.isNotBlank() } ?: d.careMessage,
                 careSimSubId = p[Keys.CARE_SIM] ?: d.careSimSubId,
                 careSimLabel = p[Keys.CARE_SIM_LABEL] ?: d.careSimLabel,
+                stopMethod = runCatching { StopMethod.valueOf(p[Keys.STOP_METHOD] ?: "") }.getOrDefault(d.stopMethod),
+                mathLevel = p[Keys.MATH_LEVEL] ?: d.mathLevel,
+                showOnLockScreen = p[Keys.SHOW_ON_LOCK] ?: d.showOnLockScreen,
                 phrases = p[Keys.PHRASES]?.split('\n')?.filter { it.isNotBlank() } ?: d.phrases,
             )
         }
@@ -154,5 +174,8 @@ class SettingsRepository(private val context: Context) {
         val current = it[Keys.PHRASES]?.split('\n')?.filter { s -> s.isNotBlank() } ?: DEFAULT_PHRASES
         it[Keys.PHRASES] = current.filter { s -> s != text }.joinToString("\n")
     }
+    suspend fun setStopMethod(v: StopMethod) = context.dataStore.edit { it[Keys.STOP_METHOD] = v.name }
+    suspend fun setMathLevel(v: Int) = context.dataStore.edit { it[Keys.MATH_LEVEL] = v.coerceIn(1, 3) }
+    suspend fun setShowOnLockScreen(v: Boolean) = context.dataStore.edit { it[Keys.SHOW_ON_LOCK] = v }
     suspend fun setOnboardingDone(v: Boolean) = context.dataStore.edit { it[Keys.ONBOARDING] = v }
 }

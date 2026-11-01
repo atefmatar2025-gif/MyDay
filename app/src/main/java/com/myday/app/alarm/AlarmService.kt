@@ -18,6 +18,7 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.myday.app.container
+import com.myday.app.settings.StopMethod
 import com.myday.app.data.autoSendsSms
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,7 +90,10 @@ class AlarmService : Service() {
         AlarmState.set(RingingInfo(task.id, task.title, task.description, task.dueAt))
         val autoSend = task.autoSendsSms
         if (autoSend) AlarmState.setAutoSend(AutoSendInfo(task.id, System.currentTimeMillis() + AUTO_SEND_DELAY_MS))
-        startInForeground(NotificationHelper.buildRingingNotification(this, task, autoSendPending = autoSend))
+        val quickStop = settings.stopMethod == StopMethod.BUTTON
+        startInForeground(
+            NotificationHelper.buildRingingNotification(this, task, autoSend, settings.showOnLockScreen, quickStop)
+        )
 
         stopPlayback()
         startSound(task.soundUri ?: settings.defaultSoundUri, settings.gradualVolume)
@@ -114,7 +118,9 @@ class AlarmService : Service() {
                 AlarmState.autoSend.collect { info ->
                     if (info == null && currentTaskId == taskId && sendJob?.isActive == true) {
                         sendJob?.cancel()
-                        startInForeground(NotificationHelper.buildRingingNotification(this@AlarmService, task, autoSendPending = false))
+                        startInForeground(
+                            NotificationHelper.buildRingingNotification(this@AlarmService, task, false, settings.showOnLockScreen, quickStop)
+                        )
                     }
                 }
             }

@@ -13,8 +13,8 @@ android {
         applicationId = "com.myday.app"
         minSdk = 26          // Android 8.0
         targetSdk = 35       // Android 15
-        versionCode = 9
-        versionName = "1.6.1"
+        versionCode = 10
+        versionName = "1.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }

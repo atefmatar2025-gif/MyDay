@@ -117,9 +117,15 @@ object NotificationHelper {
             .setSilent(true)
             .build()
 
-    fun buildRingingNotification(context: Context, task: TaskEntity, autoSendPending: Boolean = false): Notification {
+    fun buildRingingNotification(
+        context: Context,
+        task: TaskEntity,
+        autoSendPending: Boolean = false,
+        showOnLock: Boolean = true,
+        quickStop: Boolean = true,
+    ): Notification {
         val fullScreen = PendingIntent.getActivity(
-            context, (task.id * 10 + 5).toInt(), AlarmActivity.intent(context, task.id),
+            context, (task.id * 10 + 5).toInt(), AlarmActivity.intent(context, task.id, showOnLock = showOnLock),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val action = task.action
@@ -149,7 +155,7 @@ object NotificationHelper {
             .setAutoCancel(false)
             .setSilent(true)
             .setContentIntent(fullScreen)
-            .setFullScreenIntent(fullScreen, true)
+            .apply { if (showOnLock) setFullScreenIntent(fullScreen, true) }
             .apply {
                 if (task.proofCode != null) {
                     // لا يتوقف إلا بمسح الرمز من شاشة المنبه
@@ -172,6 +178,10 @@ object NotificationHelper {
                     // الرعاية: لا إيقاف دون تأكيد
                     addAction(0, "✓ تمّ", actionPending(context, AlarmActionReceiver.ACTION_COMPLETE, task.id))
                     addAction(0, "ذكّرني بعد 10 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 10))
+                } else if (!quickStop) {
+                    // طريقة الإيقاف تتطلب تحدياً: الإيقاف من شاشة المنبه فقط
+                    addAction(0, "إيقاف…", fullScreen)
+                    addAction(0, "غفوة 5 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 5))
                 } else {
                     addAction(0, "إيقاف", actionPending(context, AlarmActionReceiver.ACTION_STOP, task.id))
                     addAction(0, "غفوة 5 د", actionPending(context, AlarmActionReceiver.ACTION_SNOOZE, task.id, 5))

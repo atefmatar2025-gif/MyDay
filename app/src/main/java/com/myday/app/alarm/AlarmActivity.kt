@@ -62,6 +62,8 @@ import com.myday.app.data.TaskEntity
 import com.myday.app.data.TaskAction
 import com.myday.app.data.action
 import android.app.Activity
+import com.myday.app.settings.StopMethod
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.ui.input.pointer.pointerInput
@@ -87,10 +89,12 @@ class AlarmActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // عرض فوق شاشة القفل وتشغيل الشاشة (قابل للإيقاف من الإعدادات)
+        val showOnLock = intent.getBooleanExtra(EXTRA_SHOW_ON_LOCK, true)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        } else {
+            setShowWhenLocked(showOnLock)
+            setTurnScreenOn(showOnLock)
+        } else if (showOnLock) {
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
@@ -107,7 +111,7 @@ class AlarmActivity : ComponentActivity() {
             val s = settings
             if (s != null) {
                 MyDayTheme(themeMode = s.themeMode, dynamicColor = s.dynamicColor, textScale = s.textScale) {
-                    AlarmScreen(taskId = taskId, perform = perform, onClose = { finish() })
+                    AlarmScreen(taskId = taskId, perform = perform, stopMethod = s.stopMethod, mathLevel = s.mathLevel, onClose = { finish() })
                 }
             }
         }
@@ -116,16 +120,18 @@ class AlarmActivity : ComponentActivity() {
     companion object {
         const val EXTRA_TASK_ID = "task_id"
         const val EXTRA_PERFORM = "perform"
-        fun intent(context: Context, taskId: Long, perform: Boolean = false): Intent =
+        const val EXTRA_SHOW_ON_LOCK = "show_on_lock"
+        fun intent(context: Context, taskId: Long, perform: Boolean = false, showOnLock: Boolean = true): Intent =
             Intent(context, AlarmActivity::class.java)
                 .putExtra(EXTRA_TASK_ID, taskId)
                 .putExtra(EXTRA_PERFORM, perform)
+                .putExtra(EXTRA_SHOW_ON_LOCK, showOnLock)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
     }
 }
 
 @Composable
-private fun AlarmScreen(taskId: Long, perform: Boolean, onClose: () -> Unit) {
+private fun AlarmScreen(taskId: Long, perform: Boolean, stopMethod: StopMethod, mathLevel: Int, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val app = context.applicationContext
     val repo = app.container.repository
@@ -298,19 +304,36 @@ private fun AlarmScreen(taskId: Long, perform: Boolean, onClose: () -> Unit) {
                         }
                     }
                     Spacer(Modifier.height(16.dp))
-                    Button(
-                        onClick = { act { repo.stopRinging(taskId) } },
-                        modifier = Modifier.fillMaxWidth().height(60.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = cs.error, contentColor = cs.onError)
-                    ) { Text("إيقاف المنبه", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
-                    Spacer(Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = { act { repo.complete(taskId) } },
-                        modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) {
-                        Icon(Icons.Rounded.Check, null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("إيقاف وتحديد المهمة كمنجزة")
+                    if (stopMethod == StopMethod.BUTTON) {
+                        Button(
+                            onClick = { act { repo.stopRinging(taskId) } },
+                            modifier = Modifier.fillMaxWidth().height(60.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = cs.error, contentColor = cs.onError)
+                        ) { Text("إيقاف المنبه", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = { act { repo.complete(taskId) } },
+                            modifier = Modifier.fillMaxWidth().height(52.dp)
+                        ) {
+                            Icon(Icons.Rounded.Check, null)
+                            Spacer(Modifier.size(8.dp))
+                            Text("إيقاف وتحديد المهمة كمنجزة")
+                        }
+                    } else {
+                        // طريقة إيقاف بتحدٍّ: بعد النجاح يُوقف المنبه (أو يُنجز المهمة إن اخترت ذلك)
+                        var completeAfter by remember { mutableStateOf(false) }
+                        StopChallenge(stopMethod, mathLevel) {
+                            act { if (completeAfter) repo.complete(taskId) else repo.stopRinging(taskId) }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            Modifier.clip(RoundedCornerShape(12.dp)).clickable { completeAfter = !completeAfter }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.Checkbox(checked = completeAfter, onCheckedChange = { completeAfter = it })
+                            Text("وتحديد المهمة كمنجزة بعد الإيقاف", style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }

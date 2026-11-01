@@ -145,6 +145,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setTextScale(v: Float) = launchSafe { settingsRepo.setTextScale(v) }
     fun setCareContacts(v: List<CareContact>) = launchSafe { settingsRepo.setCareContacts(v) }
     fun setCareMessage(v: String) = launchSafe { settingsRepo.setCareMessage(v) }
+    fun setStopMethod(v: com.myday.app.settings.StopMethod) = launchSafe { settingsRepo.setStopMethod(v) }
+    fun setMathLevel(v: Int) = launchSafe { settingsRepo.setMathLevel(v) }
+    fun setShowOnLockScreen(v: Boolean) = launchSafe { settingsRepo.setShowOnLockScreen(v) }
     fun removePhrase(v: String) = launchSafe { settingsRepo.removePhrase(v) }
     fun setCareSim(subId: Int, label: String) = launchSafe { settingsRepo.setCareSim(subId, label) }
 

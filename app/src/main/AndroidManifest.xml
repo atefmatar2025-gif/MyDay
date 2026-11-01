@@ -57,8 +57,6 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
             android:taskAffinity=""
             android:theme="@style/Theme.MyDay" />
 

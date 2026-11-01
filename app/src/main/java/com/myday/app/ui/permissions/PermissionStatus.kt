@@ -93,6 +93,33 @@ object SystemSettings {
         }
     }
 
+    /** شاومي/ريدمي/بوكو تمنع العرض فوق القفل والنوافذ المنبثقة افتراضياً. */
+    val isXiaomi: Boolean
+        get() = Build.MANUFACTURER.lowercase().let { it.contains("xiaomi") || it.contains("redmi") || it.contains("poco") }
+
+    /** شركات أخرى لها قيود مشابهة. */
+    val hasOemRestrictions: Boolean
+        get() = isXiaomi || Build.MANUFACTURER.lowercase().let { m ->
+            listOf("oppo", "realme", "vivo", "huawei", "honor", "oneplus", "tecno", "infinix").any { m.contains(it) }
+        }
+
+    /** صفحة «أذونات أخرى» في MIUI/HyperOS: العرض على شاشة القفل + النوافذ المنبثقة في الخلفية. */
+    fun openLockScreenPermissions(context: Context) {
+        val pkg = context.packageName
+        context.tryStart(
+            Intent("miui.intent.action.APP_PERM_EDITOR")
+                .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                .putExtra("extra_pkgname", pkg),
+            Intent("miui.intent.action.APP_PERM_EDITOR")
+                .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.AppPermissionsEditorActivity")
+                .putExtra("extra_pkgname", pkg),
+            Intent("miui.intent.action.APP_PERM_EDITOR").putExtra("extra_pkgname", pkg),
+            appDetails(context)
+        )
+    }
+
+    fun openAppDetails(context: Context) = context.tryStart(appDetails(context))
+
     fun openBatterySettings(context: Context) {
         context.tryStart(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS), appDetails(context))
     }

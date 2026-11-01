@@ -69,6 +69,8 @@ import androidx.compose.ui.unit.dp
 import com.myday.app.settings.AppSettings
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.myday.app.settings.ThemeMode
+import com.myday.app.settings.StopMethod
+import androidx.compose.material.icons.rounded.Lock
 import com.myday.app.ui.AppViewModel
 import com.myday.app.ui.components.ConfirmDialog
 import com.myday.app.util.Fmt
@@ -142,6 +144,45 @@ fun SettingsScreen(
 
             Group("الرعاية والعائلة") {
                 CareSection(vm, settings)
+            }
+
+            Group("إيقاف المنبه وشاشة القفل") {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Text("طريقة إيقاف المنبه", style = MaterialTheme.typography.bodyLarge)
+                    Text(settings.stopMethod.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 6.dp)
+                    ) {
+                        StopMethod.entries.forEach { m ->
+                            FilterChip(selected = settings.stopMethod == m, onClick = { vm.setStopMethod(m) }, label = { Text(m.label) })
+                        }
+                    }
+                    if (settings.stopMethod == StopMethod.MATH) {
+                        Text("مستوى الصعوبة", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                        androidx.compose.foundation.layout.FlowRow(
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(1 to "سهل (24 + 7)", 2 to "متوسط (38 + 45)", 3 to "صعب (17 × 6 + 9)").forEach { (lvl, label) ->
+                                FilterChip(selected = settings.mathLevel == lvl, onClick = { vm.setMathLevel(lvl) }, label = { Text(label) })
+                            }
+                        }
+                    }
+                    Text(
+                        "الغفوة متاحة دائماً. مهام الرعاية والمنبه بإثبات لها طريقتها الخاصة.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+                SwitchItem(
+                    Icons.Rounded.Lock, "عرض المنبه فوق شاشة القفل",
+                    if (settings.showOnLockScreen) "تضيء الشاشة وتظهر شاشة المنبه كاملة دون فتح القفل" else "إشعار فقط دون شاشة كاملة",
+                    settings.showOnLockScreen, vm::setShowOnLockScreen
+                )
+                if (settings.showOnLockScreen) {
+                    ClickItem(Icons.Rounded.Security, "صلاحيات شاشة القفل", "تأكد من منحها، خصوصاً في هواتف شاومي/أوبو/هواوي", onOpenPermissions)
+                }
+                ClickItem(Icons.Rounded.AlarmAdd, "جرّب الآن", "منبه تجريبي بعد دقيقة — اقفل الشاشة وانتظر") { vm.createTestAlarm(60) }
             }
 
             Group("المنبه الافتراضي للمهام الجديدة") {
